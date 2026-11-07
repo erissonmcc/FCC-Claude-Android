@@ -1,0 +1,27 @@
+# Local Android SDK configuration
+local.properties
+
+# Gradle and Kotlin build output
+.gradle/
+.gradle-project-cache/
+.kotlin/
+**/build/
+
+# Android / IntelliJ / IDE state
+.idea/
+.androidide/
+*.iml
+
+# React Native / Node dependencies and generated files
+node_modules/
+.metro-health-check*
+.expo/
+
+# OS/editor temporary files
+.DS_Store
+Thumbs.db
+*.swp
+*.tmp
+
+# Local browser automation artifacts
+.playwright-mcp/
