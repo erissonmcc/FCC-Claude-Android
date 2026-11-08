@@ -12,6 +12,7 @@ dependencyResolutionManagement {
         google()
         mavenCentral()
         maven("https://stream-io-repo.com")
+        maven("https://jitpack.io")
     }
 }
 

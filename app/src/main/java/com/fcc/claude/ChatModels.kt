@@ -3,7 +3,26 @@ package com.fcc.claude
 import android.net.Uri
 import io.getstream.chat.android.ai.compose.parts.AIMessagePart
 import org.json.JSONObject
+import java.text.Normalizer
 import java.util.UUID
+
+private const val CHART_GUIDANCE_MARKER = "\n\n<!-- fcc:chart-guidance:v1 -->\n"
+private const val CHART_GUIDANCE = """If the user asks for a chart or graph, render it as a Markdown fenced block marked `chartjs` containing only valid Chart.js v4 configuration JSON (with `type`, `data.labels`, and `data.datasets`). Keep prose outside the block and never use ASCII art for a requested chart. For other requests, respond normally."""
+private val chartRequestPattern = Regex("\\b(graficos?|charts?|plots?|diagramas? de dados)\\b")
+
+internal fun withChartRenderingGuidance(text: String): String {
+    val normalized = Normalizer.normalize(text, Normalizer.Form.NFD)
+        .replace(Regex("\\p{Mn}+"), "")
+        .lowercase()
+    return if (chartRequestPattern.containsMatchIn(normalized)) text + CHART_GUIDANCE_MARKER + CHART_GUIDANCE else text
+}
+
+internal fun visibleChatText(text: String): String {
+    val guidanceSuffix = CHART_GUIDANCE_MARKER + CHART_GUIDANCE
+    return if (text.endsWith(guidanceSuffix)) text.removeSuffix(guidanceSuffix).trimEnd() else text
+}
+
+internal fun containsChartJsFence(text: String): Boolean = text.contains("```chartjs", ignoreCase = true)
 
 internal fun JSONObject.toSession() = ChatSession(
     id = optString("id"),
@@ -92,7 +111,7 @@ internal fun activeRunTarget(id: String, status: String): String =
     if (status in setOf("preparing", "running", "stopping")) id else ""
 
 internal fun reconcileRunMessage(message: RunMessage, id: String, run: String, text: String, receipt: Boolean, status: String): RunMessage =
-    if (receipt && id == message.id && run == message.runId && text == message.text && status == "forwarded")
+    if (receipt && id == message.id && run == message.runId && visibleChatText(text) == message.text && status == "forwarded")
         message.copy(status = "forwarded") else message
 
 internal data class PendingMessage(val id: String, val sessionId: String, val text: String)

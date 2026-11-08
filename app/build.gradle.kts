@@ -39,6 +39,7 @@ dependencies {
     implementation("io.getstream:stream-chat-android-ai-compose:0.4.0") {
         exclude(group = "androidx.activity")
     }
+    implementation("com.github.jeziellago:compose-markdown:0.7.2")
     implementation("com.composables:icons-lucide-android:2.2.1") {
         exclude(group = "org.jetbrains.kotlin")
     }

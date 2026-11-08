@@ -335,7 +335,8 @@ internal class ChatViewModel(application: Application) : AndroidViewModel(applic
                 ?: PendingOperation(value, keys, java.util.UUID.randomUUID().toString()).also { pendingOperations[active.id] = it }
         }
         val body = JSONObject().put("operation_id", operation.id)
-            .put("expected_revision", active.revision).put("expected_epoch", epoch).put("text", value)
+            .put("expected_revision", active.revision).put("expected_epoch", epoch)
+            .put("text", withChartRenderingGuidance(value))
         val optimisticId = java.util.UUID.randomUUID().toString()
         turnGeneration += 1
         sendingSessionId.value = active.id
@@ -401,7 +402,8 @@ internal class ChatViewModel(application: Application) : AndroidViewModel(applic
         try {
             val response = ChatRepository.post(
                 "/admin/api/code/sessions/${message.sessionId}/runs/${message.runId}/messages",
-                JSONObject().put("operation_id", message.id).put("text", message.text).put("expected_epoch", message.epoch),
+                JSONObject().put("operation_id", message.id).put("text", withChartRenderingGuidance(message.text))
+                    .put("expected_epoch", message.epoch),
             )
             val status = validatedRunMessageStatus(message.id, message.runId, response.optString("operation_id"),
                 response.optString("run_id"), response.optString("status"))
@@ -468,7 +470,7 @@ internal class ChatViewModel(application: Application) : AndroidViewModel(applic
                         val index = updated.indexOfFirst { it.sessionId == id && it.id == item.optString("id") && it.status == "uncertain" }
                         if (index < 0) continue
                         updated[index] = reconcileRunMessage(updated[index], item.optString("id"), item.optString("run_id"),
-                            item.optString("text"), item.optString("kind") == "user" && item.optString("session_id") == id,
+                            visibleChatText(item.optString("text")), item.optString("kind") == "user" && item.optString("session_id") == id,
                             item.optString("detail"))
                     }
                     if (updated != runMessages.toList() && persistRunMessages(updated)) {
@@ -532,7 +534,7 @@ internal class ChatViewModel(application: Application) : AndroidViewModel(applic
                     parsed += ChatItem(
                         id = value.optString("id", index.toString()),
                         kind = value.optString("kind", "text"),
-                        text = value.optString("text"),
+                        text = if (value.optString("kind") == "user") visibleChatText(value.optString("text")) else value.optString("text"),
                         title = value.optString("title"),
                         complete = value.optBoolean("complete", true),
                         runId = value.optString("run_id", ""),

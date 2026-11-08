@@ -10,6 +10,8 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -21,10 +23,14 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import com.composables.icons.lucide.R as LucideR
+import dev.jeziellago.compose.markdowntext.MarkdownText
 import io.getstream.chat.android.ai.compose.ui.component.AIMessageParts
 import io.getstream.chat.android.ai.compose.ui.component.StreamingText
 
@@ -74,12 +80,50 @@ internal fun MessageCard(item: ChatItem) {
     when (item.kind) {
         "tool_call", "reasoning" -> {
             val parts = remember(item) { listOf(item.toStreamMessagePart()) }
-            AIMessageParts(parts = parts, modifier = Modifier.fillMaxWidth())
+            StreamMessageTheme {
+                AIMessageParts(parts = parts, modifier = Modifier.fillMaxWidth())
+            }
         }
         "user" -> Text(item.text)
-        else -> StreamingText(
-            text = item.text,
-            animate = !item.complete,
-        )
+        else -> StreamMessageTheme {
+            if (containsChartJsFence(item.text)) {
+                StreamingText(text = item.text, animate = !item.complete)
+            } else {
+                StreamingText(text = item.text, animate = !item.complete) { displayedText ->
+                    MarkdownText(
+                        modifier = Modifier.fillMaxWidth(),
+                        markdown = displayedText,
+                        style = TextStyle(color = MainText, fontSize = 16.sp, lineHeight = 24.sp),
+                        linkColor = Accent,
+                        enableSoftBreakAddsNewLine = true,
+                    )
+                }
+            }
+        }
     }
+}
+
+@Composable
+internal fun StreamMessageTheme(content: @Composable () -> Unit) {
+    val baseTypography = androidx.compose.material3.Typography()
+    MaterialTheme(
+        colorScheme = darkColorScheme(
+            primary = Accent,
+            onPrimary = Backdrop,
+            background = Backdrop,
+            onBackground = MainText,
+            surface = Surface,
+            onSurface = MainText,
+            surfaceVariant = SurfaceRaised,
+            onSurfaceVariant = MutedText,
+        ),
+        typography = baseTypography.copy(
+            displayLarge = baseTypography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+            displayMedium = baseTypography.titleLarge.copy(fontWeight = FontWeight.Bold),
+            displaySmall = baseTypography.titleMedium.copy(fontWeight = FontWeight.Bold),
+            headlineMedium = baseTypography.titleMedium.copy(fontWeight = FontWeight.Bold),
+            headlineSmall = baseTypography.bodyLarge.copy(fontWeight = FontWeight.Bold),
+        ),
+        content = content,
+    )
 }

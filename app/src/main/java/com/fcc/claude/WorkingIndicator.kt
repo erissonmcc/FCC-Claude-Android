@@ -45,7 +45,9 @@ internal fun WorkingIndicator(run: ChatRun?) {
     val progress by transition.animateFloat(0f, 1f, infiniteRepeatable(tween(1600, easing = LinearEasing), RepeatMode.Restart), label = "shimmer-progress")
     val x = -highlightWidth + progress * (textWidth + 2f * highlightWidth)
     Row(Modifier.padding(horizontal = 4.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        AITypingIndicator(Modifier.size(width = 28.dp, height = 16.dp))
+        StreamMessageTheme {
+            AITypingIndicator(Modifier.size(width = 28.dp, height = 16.dp))
+        }
         androidx.compose.material3.Text("Claude está trabalhando…", onTextLayout = { textWidth = it.size.width.toFloat() }, style = TextStyle(
             brush = androidx.compose.ui.graphics.Brush.linearGradient(listOf(MutedText, MainText, MutedText), Offset(x - highlightWidth, 0f), Offset(x + highlightWidth, 0f)), fontSize = 14.sp))
         if (metrics.isNotEmpty()) Text("($metrics)", color = MutedText, fontSize = 14.sp)
