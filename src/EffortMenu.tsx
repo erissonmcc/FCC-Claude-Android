@@ -1,0 +1,401 @@
+import React, {useEffect, useRef, useState} from 'react';
+import {Animated, AppState, BackHandler, Image, Keyboard, PanResponder, ScrollView, StyleSheet, Text, View} from 'react-native';
+import {Portal} from '@gorhom/portal';
+import Reanimated, {useAnimatedStyle, useSharedValue, withTiming} from 'react-native-reanimated';
+import {Pressable} from './RipplePressable';
+
+const C = {text:'#E9E9E7',muted:'#999B9F',accent:'#D5BFA3',surface:'#212124',surfaceRaised:'#2A2B2E',line:'#FFFFFF15'};
+const labels: Record<string,string> = {minimal:'Mínimo',low:'Leve',medium:'Médio',high:'Alto',xhigh:'Muito alto',max:'Máximo'};
+export type Model = {id:string; display_name?:string; reasoning_efforts?:string[]; default_reasoning_effort?:string};
+
+export function displayName(model: Model | undefined, id: string) {
+  if (model?.display_name && model.display_name !== id) return model.display_name;
+  const parts = id.split('/').pop()!.split(/[-_]+/);
+  if (parts[0]?.toLowerCase() === 'gpt' && parts.length > 1) return `GPT-${parts[1]}${parts.slice(2).map(part => ' ' + part.charAt(0).toUpperCase() + part.slice(1)).join('')}`;
+  if (parts[0]?.toLowerCase() === 'gemini' && parts.length > 1) return `Gemini ${parts.slice(1).map(part => part.charAt(0).toUpperCase() + part.slice(1)).join(' ')}`;
+  return parts.map(part => part.charAt(0).toUpperCase() + part.slice(1)).join(' ') || 'Modelo padrão';
+}
+
+export function EffortMenu({
+  modelId,
+  models,
+  effort,
+  onSelectEffort,
+  onSelectModel,
+}: {
+  modelId: string;
+  models: Model[];
+  effort: string;
+  onSelectEffort: (effort: string) => void;
+  onSelectModel: (modelId: string) => void;
+}) {
+  const [visible, setVisible] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const opacity = useRef(new Animated.Value(0)).current;
+  const [keyboardSettled, setKeyboardSettled] = useState(true);
+  const [view, setView] = useState<'effort' | 'models'>('effort');
+  const triggerRef = useRef<View>(null);
+  const overlayRef = useRef<View>(null);
+  const [position, setPosition] = useState<{left: number; bottom: number; width: number} | null>(null);
+
+  // Filtra apenas modelos da OpenAI e Google Vertex AI
+  const filteredModels = models.filter(item => {
+    const id = item.id.toLowerCase();
+    return id.startsWith('openai/') || id.startsWith('vertex/');
+  });
+
+  const model = models.find(entry => entry.id === modelId);
+  const values = model?.reasoning_efforts ?? [];
+  const selectedEffort = values.includes(effort) ? effort : model?.default_reasoning_effort || values[0] || '';
+  const name = displayName(model, modelId);
+  const compactHeight = values.length > 0 ? 130 : 86;
+  const panelHeight = useSharedValue(compactHeight);
+  const animatedPanelStyle = useAnimatedStyle(() => ({height: panelHeight.value}));
+
+  const showModels = () => {
+    setView('models');
+    panelHeight.value = withTiming(344, {duration: 260});
+  };
+
+  const showEffort = () => {
+    setView('effort');
+    panelHeight.value = withTiming(compactHeight, {duration: 260});
+  };
+
+  useEffect(() => {
+    if (visible) return;
+    const animation = Animated.timing(opacity, {
+      toValue: 0, duration: 160, useNativeDriver: true,
+    });
+    animation.start(({finished}) => {
+      if (finished) {
+        setMounted(false);
+        setView('effort');
+      }
+    });
+    return () => animation.stop();
+  }, [visible, opacity]);
+
+  useEffect(() => {
+    if (!visible || !position || !keyboardSettled) return;
+    const animation = Animated.timing(opacity, {
+      toValue: 1, duration: 180, useNativeDriver: true,
+    });
+    animation.start();
+    return () => animation.stop();
+  }, [visible, position, opacity, keyboardSettled]);
+
+  const positionMenu = (onPositioned?: () => void) => {
+    overlayRef.current?.measureInWindow((overlayX, overlayY, overlayWidth, overlayHeight) => {
+      triggerRef.current?.measureInWindow((x, y, width) => {
+        const panelWidth = Math.min(290, overlayWidth - 24);
+        setPosition({
+          width: panelWidth,
+          left: Math.max(12, Math.min(x + width - overlayX - panelWidth, overlayWidth - panelWidth - 12)),
+          bottom: overlayHeight - (y - overlayY) + 8,
+        });
+        onPositioned?.();
+      });
+    });
+  };
+
+  useEffect(() => {
+    if (!visible) {
+      return;
+    }
+    const listener = Keyboard.addListener('keyboardDidHide', () => {
+      setPosition(null);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => positionMenu(() => setKeyboardSettled(true)));
+      });
+    });
+    const appState = AppState.addEventListener('change', state => {
+      if (state === 'active') requestAnimationFrame(() => positionMenu());
+    });
+    const back = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (view === 'models') {
+        showEffort();
+        return true;
+      }
+      setVisible(false);
+      return true;
+    });
+    return () => {
+      listener.remove();
+      appState.remove();
+      back.remove();
+    };
+  }, [visible, view]);
+
+  return (
+    <>
+      <View ref={triggerRef} collapsable={false} style={s.anchor} onLayout={() => { if (visible) positionMenu(); }}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Modelo e esforço de raciocínio"
+          accessibilityState={{expanded: visible}}
+          onPress={() => {
+            setKeyboardSettled(!Keyboard.isVisible());
+            Keyboard.dismiss();
+            opacity.setValue(0);
+            setPosition(null);
+            setView('effort');
+            panelHeight.value = compactHeight;
+            setMounted(true);
+            setVisible(true);
+          }}
+          style={s.trigger}
+        >
+          {mounted ? (
+            <Text numberOfLines={1} style={s.muted}>Selecionar esforço</Text>
+          ) : (
+            <>
+              <Text numberOfLines={1} style={s.name}>{name}</Text>
+              {!!selectedEffort && <Text style={s.muted}>{labels[selectedEffort] || selectedEffort}</Text>}
+            </>
+          )}
+          <Image source={require('./assets/lucide/chevron_down.png')} style={s.smallIcon} />
+        </Pressable>
+      </View>
+
+      {mounted && (
+        <Portal>
+          <View ref={overlayRef} collapsable={false} style={s.overlay} onLayout={() => positionMenu()}>
+            <Pressable
+              android_ripple={null}
+              accessibilityLabel="Fechar seletor"
+              style={StyleSheet.absoluteFill}
+              onPress={() => setVisible(false)}
+            />
+            <Animated.View pointerEvents={visible ? 'auto' : 'none'} style={[s.panelFade, position, {opacity}]}>
+            <Reanimated.View style={[s.panelAnchor, animatedPanelStyle]}>
+            <Reanimated.View style={s.panel}>
+              <View key={view} collapsable={false} style={s.panelContent}>
+              {view === 'effort' ? (
+                <>
+                  <View style={s.heading}>
+                    <Pressable style={s.resetButton} accessibilityRole="button" accessibilityLabel="Raio" onPress={() => {}}>
+                      <Image source={require('./assets/lucide/zap.png')} style={s.resetIcon} />
+                    </Pressable>
+                    <Text style={s.previewTitle}>{labels[selectedEffort] || selectedEffort}</Text>
+                    <Pressable
+                      style={s.resetButton}
+                      accessibilityRole="button"
+                      accessibilityLabel="Restaurar esforço padrão"
+                      disabled={!model?.default_reasoning_effort}
+                      onPress={() => model?.default_reasoning_effort && onSelectEffort(model.default_reasoning_effort)}
+                      hitSlop={10}
+                    >
+                      <Image source={require('./assets/lucide/refresh_ccw.png')} style={s.resetIcon} />
+                    </Pressable>
+                  </View>
+
+                  <Pressable style={s.modelRow} onPress={showModels}>
+                    <Text numberOfLines={1} style={s.name}>{name}</Text>
+                    <Image source={require('./assets/lucide/chevron_right.png')} style={s.smallIcon} />
+                  </Pressable>
+
+                  {values.length > 0 && (
+                    <EffortSlider
+                      key={`${modelId}-${selectedEffort}`}
+                      values={values}
+                      selected={selectedEffort}
+                      onSelect={value => {
+                        onSelectEffort(value);
+                        setVisible(false);
+                      }}
+                    />
+                  )}
+                </>
+              ) : (
+                <View style={s.modelsContainer}>
+                  <View style={s.modelsHeader}>
+                    <Pressable
+                      style={s.backButton}
+                      accessibilityRole="button"
+                      accessibilityLabel="Voltar ao esforço"
+                      onPress={showEffort}
+                      hitSlop={8}
+                    >
+                      <Image source={require('./assets/lucide/chevron_right.png')} style={[s.smallIcon, {transform: [{rotate: '180deg'}]}]} />
+                    </Pressable>
+                    <Text style={s.modelsTitle}>Selecionar modelo</Text>
+                    <View style={s.backButton} />
+                  </View>
+
+                  <ScrollView style={s.modelsList} contentContainerStyle={s.modelsListContent} bounces={false}>
+                    <Pressable
+                      style={[s.modelItem, !modelId && s.modelItemActive]}
+                      onPress={() => {
+                        onSelectModel('');
+                        showEffort();
+                      }}
+                    >
+                      <View style={s.modelInfo}>
+                        <Text style={[s.modelItemTitle, !modelId && s.modelItemTitleActive]}>Padrão</Text>
+                        <Text style={s.modelItemSubtitle}>Conjunto recomendado de modelos</Text>
+                      </View>
+                      {!modelId && <Image source={require('./assets/lucide/check.png')} style={s.checkIcon} />}
+                    </Pressable>
+
+                    {filteredModels.map(item => {
+                      const isSelected = item.id === modelId;
+                      const itemTitle = displayName(item, item.id);
+                      return (
+                        <Pressable
+                          key={item.id}
+                          style={[s.modelItem, isSelected && s.modelItemActive]}
+                          onPress={() => {
+                            onSelectModel(item.id);
+                            showEffort();
+                          }}
+                        >
+                          <View style={s.modelInfo}>
+                            <Text numberOfLines={1} style={[s.modelItemTitle, isSelected && s.modelItemTitleActive]}>
+                              {itemTitle}
+                            </Text>
+                          </View>
+                          {isSelected && <Image source={require('./assets/lucide/check.png')} style={s.checkIcon} />}
+                        </Pressable>
+                      );
+                    })}
+                  </ScrollView>
+                </View>
+              )}
+              </View>
+            </Reanimated.View>
+            </Reanimated.View>
+            </Animated.View>
+          </View>
+        </Portal>
+      )}
+    </>
+  );
+}
+
+function EffortSlider({values, selected, onSelect}: {values: string[]; selected: string; onSelect: (value: string) => void}) {
+  const [preview, setPreview] = useState(Math.max(0, values.indexOf(selected)));
+  const [layoutWidth, setLayoutWidth] = useState(0);
+  const sliderRef = useRef<View>(null);
+  const width = useRef(0);
+  const pageXOffset = useRef(0);
+  const current = useRef(preview);
+  const latest = useRef({values, onSelect});
+  latest.current = {values, onSelect};
+  const inset = 24;
+
+  const updateFromPageX = (pageX: number) => {
+    const x = pageX - pageXOffset.current;
+    const count = latest.current.values.length;
+    const trackWidth = Math.max(1, width.current - inset * 2);
+    const index = Math.max(0, Math.min(count - 1, Math.round((x - inset) / trackWidth * (count - 1))));
+    current.current = index;
+    setPreview(index);
+  };
+
+  const responder = useRef(PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: () => true,
+    onPanResponderGrant: event => {
+      sliderRef.current?.measureInWindow(x => {
+        pageXOffset.current = x;
+        updateFromPageX(event.nativeEvent.pageX);
+      });
+    },
+    onPanResponderMove: event => updateFromPageX(event.nativeEvent.pageX),
+    onPanResponderRelease: () => latest.current.onSelect(latest.current.values[current.current]),
+    onPanResponderTerminationRequest: () => false,
+  })).current;
+
+  const range = Math.max(0, layoutWidth - inset * 2);
+  const progress = values.length > 1 ? preview / (values.length - 1) : 0;
+
+  return (
+    <View>
+      <View
+        ref={sliderRef}
+        collapsable={false}
+        accessible
+        accessibilityRole="adjustable"
+        accessibilityLabel="Esforço de raciocínio"
+        accessibilityValue={{min: 0, max: values.length - 1, now: preview, text: labels[values[preview]] || values[preview]}}
+        accessibilityActions={[{name: 'increment'}, {name: 'decrement'}]}
+        onAccessibilityAction={event => {
+          const next = Math.max(0, Math.min(values.length - 1, preview + (event.nativeEvent.actionName === 'increment' ? 1 : -1)));
+          onSelect(values[next]);
+        }}
+        onLayout={event => {
+          width.current = event.nativeEvent.layout.width;
+          setLayoutWidth(width.current);
+          sliderRef.current?.measureInWindow(x => { pageXOffset.current = x; });
+        }}
+        {...responder.panHandlers}
+        style={s.slider}
+      >
+        <View pointerEvents="none" style={s.track} />
+        <View pointerEvents="none" style={[s.fill, {width: range * progress + inset}]} />
+        <View pointerEvents="none" style={[s.steps, {left: inset, right: inset}]}>
+          {values.map((value, index) => <View key={value} style={[s.dot, index === preview && {opacity: 0}]} />)}
+        </View>
+        <View pointerEvents="none" style={[s.thumb, {left: inset + range * progress - 16}]} />
+      </View>
+    </View>
+  );
+}
+
+const s = StyleSheet.create({
+  anchor: {marginLeft: 'auto', marginRight: 8, flexShrink: 1},
+  resetButton: {width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center'},
+  trigger: {flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, minHeight: 42, borderRadius: 21},
+  name: {color: C.text, fontSize: 13, flexShrink: 1},
+  muted: {color: C.muted, fontSize: 13, flexShrink: 1},
+  smallIcon: {width: 16, height: 16, tintColor: C.muted},
+  overlay: {...StyleSheet.absoluteFillObject, zIndex: 100, elevation: 20},
+  panelFade: {
+    position: 'absolute',
+    height: 344,
+    elevation: 12,
+  },
+  panelAnchor: {position: 'absolute', left: 0, right: 0, bottom: 0},
+  panel: {
+    width: '100%',
+    height: '100%',
+    overflow: 'hidden',
+    backgroundColor: C.surface,
+    borderRadius: 26,
+    borderWidth: 1,
+    borderColor: '#FFFFFF24',
+  },
+  panelContent: {flex: 1, justifyContent: 'flex-end', paddingHorizontal: 12, paddingVertical: 8},
+  heading: {flexDirection: 'row', alignItems: 'center'},
+  previewTitle: {flex: 1, textAlign: 'center', color: '#60A5FA', fontSize: 17, fontWeight: '500'},
+  resetIcon: {width: 18, height: 18, tintColor: C.muted},
+  modelRow: {flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', minHeight: 28, marginVertical: 4},
+  slider: {height: 44, marginHorizontal: 4, justifyContent: 'center'},
+  track: {position: 'absolute', height: 22, borderRadius: 11, backgroundColor: '#414348', left: 16, right: 16},
+  fill: {position: 'absolute', height: 22, borderRadius: 11, backgroundColor: C.accent, left: 16},
+  steps: {position: 'absolute', left: 16, right: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'},
+  dot: {width: 7, height: 7, borderRadius: 4, backgroundColor: '#85878B'},
+  thumb: {position: 'absolute', width: 32, height: 32, top: 6, borderRadius: 16, backgroundColor: C.text},
+
+  modelsContainer: {paddingVertical: 4},
+  modelsHeader: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6},
+  backButton: {width: 32, height: 32, alignItems: 'center', justifyContent: 'center', borderRadius: 16},
+  modelsTitle: {color: C.muted, fontSize: 14, fontWeight: '500'},
+  modelsList: {height: 280, flexGrow: 0, flexShrink: 0},
+  modelsListContent: {paddingBottom: 4},
+  modelItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    borderRadius: 14,
+  },
+  modelItemActive: {backgroundColor: '#FFFFFF0D'},
+  modelInfo: {flex: 1, paddingRight: 8},
+  modelItemTitle: {color: C.text, fontSize: 14, fontWeight: '500'},
+  modelItemTitleActive: {color: '#FFF'},
+  modelItemSubtitle: {color: C.muted, fontSize: 11, marginTop: 2},
+  checkIcon: {width: 20, height: 20, tintColor: C.text},
+});

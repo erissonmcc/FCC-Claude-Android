@@ -1,0 +1,89 @@
+diff --git a/node_modules/react-native-enriched-markdown/android/src/main/java/com/swmansion/enriched/markdown/EnrichedMarkdownText.kt b/node_modules/react-native-enriched-markdown/android/src/main/java/com/swmansion/enriched/markdown/EnrichedMarkdownText.kt
+index 4e2ac0d..70ba57f 100644
+--- a/node_modules/react-native-enriched-markdown/android/src/main/java/com/swmansion/enriched/markdown/EnrichedMarkdownText.kt
++++ b/node_modules/react-native-enriched-markdown/android/src/main/java/com/swmansion/enriched/markdown/EnrichedMarkdownText.kt
+@@ -9,6 +9,7 @@ import android.text.Layout
+ import android.util.AttributeSet
+ import android.util.Log
+ import android.view.MotionEvent
++import android.view.ViewGroup
+ import androidx.appcompat.widget.AppCompatTextView
+ import com.facebook.react.bridge.ReadableMap
+ import com.swmansion.enriched.markdown.accessibility.MarkdownAccessibilityHelper
+@@ -47,6 +48,7 @@ class EnrichedMarkdownText
+     private val mainHandler = Handler(Looper.getMainLooper())
+     private val executor = Executors.newSingleThreadExecutor()
+     private var currentRenderId = 0L
++    private var pendingStyledText: CharSequence? = null
+ 
+     val layoutManager = EnrichedMarkdownTextLayoutManager(this)
+ 
+@@ -74,9 +76,16 @@ class EnrichedMarkdownText
+     private var fadeAnimator: TailFadeInAnimator? = null
+ 
+     init {
++      ensureLayoutParams()
+       setupAsMarkdownTextView(accessibilityHelper)
+     }
+ 
++    private fun ensureLayoutParams() {
++      if (layoutParams == null) {
++        layoutParams = ViewGroup.LayoutParams(0, 0)
++      }
++    }
++
+     fun setMarkdownContent(markdown: String) {
+       if (currentMarkdown == markdown) return
+       currentMarkdown = markdown
+@@ -188,7 +197,7 @@ class EnrichedMarkdownText
+         try {
+           val ast =
+             parser.parseMarkdown(markdown, md4cFlags) ?: run {
+-              mainHandler.post { if (renderId == currentRenderId) text = "" }
++              mainHandler.post { if (renderId == currentRenderId && isAttachedToWindow) text = "" }
+               return@execute
+             }
+ 
+@@ -197,19 +206,32 @@ class EnrichedMarkdownText
+ 
+           mainHandler.post {
+             if (renderId == currentRenderId) {
+-              applyRenderedText(styledText)
++              if (isAttachedToWindow) {
++                applyRenderedText(styledText)
++              } else {
++                pendingStyledText = styledText
++              }
+             }
+           }
+         } catch (e: Exception) {
+           Log.e(TAG, "Render failed: ${e.message}", e)
+-          mainHandler.post { if (renderId == currentRenderId) text = "" }
++          mainHandler.post { if (renderId == currentRenderId && isAttachedToWindow) text = "" }
+         }
+       }
+     }
+ 
++    override fun onAttachedToWindow() {
++      super.onAttachedToWindow()
++      pendingStyledText?.let {
++        pendingStyledText = null
++        applyRenderedText(it)
++      }
++    }
++
+     private fun applyRenderedText(styledText: CharSequence) {
+       val tailStart = previousTextLength
+ 
++      ensureLayoutParams()
+       text = styledText
+ 
+       if (movementMethod !is LinkLongPressMovementMethod) {
+@@ -233,6 +255,7 @@ class EnrichedMarkdownText
+     }
+ 
+     fun setIsSelectable(selectable: Boolean) {
++      ensureLayoutParams()
+       applySelectableState(selectable)
+     }
+ 

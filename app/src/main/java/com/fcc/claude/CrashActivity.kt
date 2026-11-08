@@ -2,80 +2,64 @@ package com.fcc.claude
 
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.graphics.Color
 import android.os.Bundle
-import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.Text
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import android.view.Gravity
+import android.widget.Button
+import android.widget.LinearLayout
+import android.widget.ScrollView
+import android.widget.TextView
+import android.app.Activity
 import java.io.File
 
-class CrashActivity : ComponentActivity() {
+class CrashActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.statusBarColor = android.graphics.Color.rgb(16, 17, 19)
-        window.navigationBarColor = android.graphics.Color.rgb(16, 17, 19)
+        window.statusBarColor = Color.rgb(16, 17, 19)
+        window.navigationBarColor = Color.rgb(16, 17, 19)
         val report = File(filesDir, CRASH_REPORT_FILE).takeIf(File::exists)?.readText()
             ?: "Não foi possível carregar os detalhes do erro."
-        setContent {
-            val context = LocalContext.current
-            var copied by remember { mutableStateOf(false) }
-            Column(
-                Modifier.fillMaxSize().background(Backdrop)
-                    .statusBarsPadding().navigationBarsPadding().padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                Text("O aplicativo parou", color = MainText, fontSize = 24.sp)
-                Text("Detalhes completos do erro", color = MutedText, fontSize = 14.sp)
-                Column(
-                    Modifier.weight(1f).fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Surface)
-                        .verticalScroll(rememberScrollState())
-                        .padding(14.dp),
-                ) {
-                    SelectionContainer {
-                        Text(
-                            report,
-                            style = TextStyle(color = MainText, fontSize = 12.sp, lineHeight = 18.sp,
-                                fontFamily = FontFamily.Monospace),
-                        )
-                    }
-                }
-                Button(
-                    onClick = {
-                        val clipboard = context.getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
-                        clipboard.setPrimaryClip(ClipData.newPlainText("Erro do aplicativo", report))
-                        copied = true
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(if (copied) "Erro copiado" else "Copiar erro completo")
-                }
-            }
+        val padding = (20 * resources.displayMetrics.density).toInt()
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(padding, padding, padding, padding)
+            setBackgroundColor(Color.rgb(16, 17, 19))
         }
+        root.addView(TextView(this).apply {
+            text = "O aplicativo parou"
+            textSize = 24f
+            setTextColor(Color.rgb(233, 233, 231))
+        })
+        root.addView(TextView(this).apply {
+            text = "Detalhes completos do erro"
+            textSize = 14f
+            setTextColor(Color.rgb(153, 155, 159))
+            setPadding(0, padding / 4, 0, padding / 2)
+        })
+        val reportView = TextView(this).apply {
+            text = report
+            textSize = 12f
+            typeface = android.graphics.Typeface.MONOSPACE
+            setTextColor(Color.rgb(233, 233, 231))
+            setTextIsSelectable(true)
+            setPadding(padding / 2, padding / 2, padding / 2, padding / 2)
+        }
+        root.addView(ScrollView(this).apply {
+            setBackgroundColor(Color.rgb(27, 28, 31))
+            addView(reportView)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f,
+            ).apply { bottomMargin = padding / 2 }
+        })
+        root.addView(Button(this).apply {
+            text = "Copiar erro completo"
+            setOnClickListener {
+                val clipboard = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
+                clipboard.setPrimaryClip(ClipData.newPlainText("Erro do aplicativo", report))
+                text = "Erro copiado"
+            }
+        }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+        root.gravity = Gravity.CENTER_VERTICAL
+        setContentView(root)
     }
 }

@@ -1,0 +1,35 @@
+{
+  "name": "fcc-claude",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "android": "react-native run-android",
+    "start": "react-native start",
+    "postinstall": "patch-package"
+  },
+  "dependencies": {
+    "@copilotkit/react-native": "1.85.0",
+    "@gorhom/bottom-sheet": "5.2.6",
+    "@gorhom/portal": "1.0.14",
+    "react": "19.1.0",
+    "react-native": "0.81.5",
+    "react-native-enriched-markdown": "0.4.0",
+    "react-native-gesture-handler": "2.28.0",
+    "react-native-reanimated": "4.3.0",
+    "react-native-safe-area-context": "5.6.2",
+    "react-native-streamdown": "0.1.2",
+    "react-native-worklets": "0.8.3",
+    "remend": "1.3.0"
+  },
+  "devDependencies": {
+    "@babel/core": "7.25.2",
+    "@babel/plugin-transform-export-namespace-from": "7.27.1",
+    "@react-native-community/cli": "20.0.2",
+    "@react-native-community/cli-platform-android": "20.0.2",
+    "@react-native/babel-preset": "0.81.5",
+    "@react-native/metro-config": "0.81.5",
+    "@types/react": "19.1.16",
+    "patch-package": "8.0.0",
+    "typescript": "5.3.3"
+  }
+}

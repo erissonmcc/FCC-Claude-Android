@@ -1,11 +1,17 @@
 # Local Android SDK configuration
 local.properties
+.env
+
+# React Native dependencies
+node_modules/
+.metro-cache/
 
 # Gradle and Kotlin build output
 .gradle/
 .gradle-project-cache/
 .kotlin/
 **/build/
+**/.cxx/
 
 # Android / IntelliJ / IDE state
 .idea/

@@ -5,12 +5,38 @@ import android.app.Application
 import android.content.Intent
 import android.os.Build
 import android.os.Process
+import com.facebook.react.PackageList
+import com.facebook.react.ReactApplication
+import com.facebook.react.ReactHost
+import com.facebook.react.ReactNativeHost
+import com.facebook.react.ReactPackage
+import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint.load
+import com.facebook.react.defaults.DefaultReactHost.getDefaultReactHost
+import com.facebook.react.defaults.DefaultReactNativeHost
+import com.facebook.react.soloader.OpenSourceMergedSoMapping
+import com.facebook.soloader.SoLoader
 import java.io.File
 import kotlin.system.exitProcess
 
-class CrashApplication : Application() {
+class CrashApplication : Application(), ReactApplication {
+    override val reactNativeHost: ReactNativeHost = object : DefaultReactNativeHost(this) {
+        override fun getPackages(): List<ReactPackage> = PackageList(this).packages.apply {
+            add(FccChatPackage())
+        }
+
+        override fun getJSMainModuleName() = "index"
+        override fun getUseDeveloperSupport() = BuildConfig.DEBUG && BuildConfig.REACT_NATIVE_DEV_SUPPORT
+        override val isNewArchEnabled = BuildConfig.IS_NEW_ARCHITECTURE_ENABLED
+        override val isHermesEnabled = BuildConfig.IS_HERMES_ENABLED
+    }
+
+    override val reactHost: ReactHost
+        get() = getDefaultReactHost(applicationContext, reactNativeHost)
+
     override fun onCreate() {
         super.onCreate()
+        SoLoader.init(this, OpenSourceMergedSoMapping)
+        if (BuildConfig.IS_NEW_ARCHITECTURE_ENABLED) load()
         val processName = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             Application.getProcessName()
         } else {
