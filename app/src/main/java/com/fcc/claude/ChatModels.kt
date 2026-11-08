@@ -1,6 +1,7 @@
 package com.fcc.claude
 
 import android.net.Uri
+import io.getstream.chat.android.ai.compose.parts.AIMessagePart
 import org.json.JSONObject
 import java.util.UUID
 
@@ -25,6 +26,29 @@ internal data class ChatItem(
     val runId: String = "",
     val ordinal: Long = Long.MAX_VALUE,
     val sequence: Long = Long.MAX_VALUE,
+)
+
+internal fun ChatItem.toStreamMessagePart(): AIMessagePart = requireNotNull(
+    when (kind) {
+        "reasoning" -> AIMessagePart.from(
+            "ai_reasoning",
+            mapOf(
+                "id" to id,
+                "status" to if (complete) "completed" else "streaming",
+                "preview" to text,
+            ),
+        )
+        else -> AIMessagePart.from(
+            "ai_tool_call",
+            mapOf(
+                "id" to id,
+                "name" to title.ifBlank { "Ferramenta" },
+                "display_title" to title.ifBlank { "Ferramenta" },
+                "status" to if (complete) "completed" else "running",
+                "summary" to text,
+            ),
+        )
+    },
 )
 
 internal fun mergeChatItems(retained: List<ChatItem>, incoming: List<ChatItem>): List<ChatItem> =

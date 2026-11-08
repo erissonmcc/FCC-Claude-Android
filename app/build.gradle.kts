@@ -34,16 +34,13 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-text")
-    implementation("androidx.compose.ui:ui-tooling-preview")
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.7")
-    implementation("androidx.appcompat:appcompat:1.6.1")
-    implementation("androidx.core:core-ktx:1.16.0")
-    implementation("androidx.recyclerview:recyclerview:1.4.0")
+    implementation("io.getstream:stream-chat-android-ai-compose:0.4.0") {
+        exclude(group = "androidx.activity")
+    }
     implementation("com.composables:icons-lucide-android:2.2.1") {
         exclude(group = "org.jetbrains.kotlin")
     }
     testImplementation("junit:junit:4.13.2")
-    debugImplementation("androidx.compose.ui:ui-tooling")
 }
