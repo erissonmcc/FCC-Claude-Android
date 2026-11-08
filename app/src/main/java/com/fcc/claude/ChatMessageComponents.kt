@@ -25,7 +25,6 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import com.composables.icons.lucide.R as LucideR
-import io.getstream.chat.android.ai.compose.ui.component.AIMessageParts
 
 @Composable
 internal fun AttachmentThumbnail(attachment: PendingAttachment) {
@@ -70,12 +69,5 @@ internal fun ConversationSkeleton() {
 
 @Composable
 internal fun MessageCard(item: ChatItem) {
-    if (item.kind == "tool_call" || item.kind == "reasoning") {
-        val parts = remember(item) { listOf(item.toStreamMessagePart()) }
-        StreamMessageTheme {
-            AIMessageParts(parts = parts, modifier = Modifier.fillMaxWidth())
-        }
-    } else {
-        MarkdownMessage(item.text, animate = item.kind != "user" && !item.complete)
-    }
+    Text(item.text)
 }

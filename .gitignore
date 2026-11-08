@@ -12,11 +12,6 @@ local.properties
 .androidide/
 *.iml
 
-# React Native / Node dependencies and generated files
-node_modules/
-.metro-health-check*
-.expo/
-
 # OS/editor temporary files
 .DS_Store
 Thumbs.db

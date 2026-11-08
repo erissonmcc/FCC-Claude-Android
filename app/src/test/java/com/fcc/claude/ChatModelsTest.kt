@@ -124,37 +124,6 @@ class ChatModelsTest {
     }
 
     @Test
-    fun toolCallChatItemMapsToStreamToolCallWithInputAndStatus() {
-        val item = ChatItem("call-1", "tool_call", "{\"path\":\"src/Main.kt\"}", title = "Read")
-
-        val part = item.toStreamMessagePart()
-
-        assertEquals("ai_tool_call", part.kind.rawValue)
-        assertEquals("call-1", part.toolCall?.id)
-        assertEquals("Read", part.toolCall?.displayTitle)
-        assertEquals(item.text, part.toolCall?.summary)
-        assertEquals("completed", part.toolCall?.status.toString())
-    }
-
-    @Test
-    fun reasoningChatItemMapsToStreamReasoningWithCompletionState() {
-        val item = ChatItem("reasoning-1", "reasoning", "Checking the request", complete = false)
-
-        val part = item.toStreamMessagePart()
-
-        assertEquals("ai_reasoning", part.kind.rawValue)
-        assertEquals("Checking the request", part.reasoning?.preview)
-        assertTrue(part.reasoning?.isStreaming == true)
-    }
-
-    @Test
-    fun streamingToolCallChatItemMapsToRunningStreamStatus() {
-        val item = ChatItem("call-2", "tool_call", "{}", title = "Bash", complete = false)
-
-        assertEquals("running", item.toStreamMessagePart().toolCall?.status.toString())
-    }
-
-    @Test
     fun mergeChatItemsDeduplicatesByIdAndOrdersByRunAndSequence() {
         val retained = listOf(
             ChatItem("later", "assistant", "old", ordinal = 2, sequence = 2),

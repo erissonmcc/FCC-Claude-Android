@@ -11,7 +11,6 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
-        maven("https://stream-io-repo.com")
     }
 }
 

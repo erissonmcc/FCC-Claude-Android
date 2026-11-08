@@ -41,13 +41,9 @@ dependencies {
     implementation("androidx.appcompat:appcompat:1.6.1")
     implementation("androidx.core:core-ktx:1.16.0")
     implementation("androidx.recyclerview:recyclerview:1.4.0")
-    implementation("io.getstream:stream-chat-android-ai-compose:0.4.0") {
-        exclude(group = "androidx.activity")
-    }
     implementation("com.composables:icons-lucide-android:2.2.1") {
         exclude(group = "org.jetbrains.kotlin")
     }
-    testImplementation("org.jetbrains:markdown:0.7.3")
     testImplementation("junit:junit:4.13.2")
     debugImplementation("androidx.compose.ui:ui-tooling")
 }
