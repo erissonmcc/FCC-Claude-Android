@@ -24,6 +24,7 @@ extensions.configure<com.facebook.react.ReactSettingsExtension> {
     autolinkLibrariesFromCommand(
         workingDirectory = settingsDir,
         lockFiles = files("package.json", "package-lock.json", "react-native.config.js"),
+        command = listOf("node", "node_modules/@react-native-community/cli/build/bin.js", "config"),
     )
 }
 

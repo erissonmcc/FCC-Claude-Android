@@ -2,9 +2,10 @@ import React, {useEffect, useRef, useState} from 'react';
 import {Animated, AppState, BackHandler, Image, Keyboard, PanResponder, ScrollView, StyleSheet, Text, View} from 'react-native';
 import {Portal} from '@gorhom/portal';
 import Reanimated, {useAnimatedStyle, useSharedValue, withTiming} from 'react-native-reanimated';
-import {Pressable} from './RipplePressable';
+import {useStyles} from 'react-native-unistyles';
+import {Pressable} from '../Pressable/Pressable';
+import {stylesheet} from './styles';
 
-const C = {text:'#E9E9E7',muted:'#999B9F',accent:'#D5BFA3',surface:'#212124',surfaceRaised:'#2A2B2E',line:'#FFFFFF15'};
 const labels: Record<string,string> = {minimal:'Mínimo',low:'Leve',medium:'Médio',high:'Alto',xhigh:'Muito alto',max:'Máximo'};
 export type Model = {id:string; display_name?:string; reasoning_efforts?:string[]; default_reasoning_effort?:string};
 
@@ -29,6 +30,7 @@ export function EffortMenu({
   onSelectEffort: (effort: string) => void;
   onSelectModel: (modelId: string) => void;
 }) {
+  const {styles: s} = useStyles(stylesheet);
   const [visible, setVisible] = useState(false);
   const [mounted, setMounted] = useState(false);
   const opacity = useRef(new Animated.Value(0)).current;
@@ -103,12 +105,15 @@ export function EffortMenu({
     if (!visible) {
       return;
     }
-    const listener = Keyboard.addListener('keyboardDidHide', () => {
+    const repositionAfterKeyboardLayout = () => {
       setPosition(null);
+      setKeyboardSettled(false);
       requestAnimationFrame(() => {
-        requestAnimationFrame(() => positionMenu(() => setKeyboardSettled(true)));
+        requestAnimationFrame(() => requestAnimationFrame(() => positionMenu(() => setKeyboardSettled(true))));
       });
-    });
+    };
+    const keyboardShown = Keyboard.addListener('keyboardDidShow', repositionAfterKeyboardLayout);
+    const keyboardHidden = Keyboard.addListener('keyboardDidHide', repositionAfterKeyboardLayout);
     const appState = AppState.addEventListener('change', state => {
       if (state === 'active') requestAnimationFrame(() => positionMenu());
     });
@@ -121,7 +126,8 @@ export function EffortMenu({
       return true;
     });
     return () => {
-      listener.remove();
+      keyboardShown.remove();
+      keyboardHidden.remove();
       appState.remove();
       back.remove();
     };
@@ -135,14 +141,17 @@ export function EffortMenu({
           accessibilityLabel="Modelo e esforço de raciocínio"
           accessibilityState={{expanded: visible}}
           onPress={() => {
-            setKeyboardSettled(!Keyboard.isVisible());
-            Keyboard.dismiss();
+            const keyboardVisible = Keyboard.isVisible();
+            setKeyboardSettled(!keyboardVisible);
             opacity.setValue(0);
             setPosition(null);
             setView('effort');
             panelHeight.value = compactHeight;
             setMounted(true);
             setVisible(true);
+            if (keyboardVisible) {
+              requestAnimationFrame(() => requestAnimationFrame(() => positionMenu(() => setKeyboardSettled(true))));
+            }
           }}
           style={s.trigger}
         >
@@ -154,7 +163,7 @@ export function EffortMenu({
               {!!selectedEffort && <Text style={s.muted}>{labels[selectedEffort] || selectedEffort}</Text>}
             </>
           )}
-          <Image source={require('./assets/lucide/chevron_down.png')} style={s.smallIcon} />
+          <Image source={require('../../assets/lucide/chevron_down.png')} style={s.smallIcon} />
         </Pressable>
       </View>
 
@@ -175,7 +184,7 @@ export function EffortMenu({
                 <>
                   <View style={s.heading}>
                     <Pressable style={s.resetButton} accessibilityRole="button" accessibilityLabel="Raio" onPress={() => {}}>
-                      <Image source={require('./assets/lucide/zap.png')} style={s.resetIcon} />
+                      <Image source={require('../../assets/lucide/zap.png')} style={s.resetIcon} />
                     </Pressable>
                     <Text style={s.previewTitle}>{labels[selectedEffort] || selectedEffort}</Text>
                     <Pressable
@@ -186,13 +195,13 @@ export function EffortMenu({
                       onPress={() => model?.default_reasoning_effort && onSelectEffort(model.default_reasoning_effort)}
                       hitSlop={10}
                     >
-                      <Image source={require('./assets/lucide/refresh_ccw.png')} style={s.resetIcon} />
+                      <Image source={require('../../assets/lucide/refresh_ccw.png')} style={s.resetIcon} />
                     </Pressable>
                   </View>
 
                   <Pressable style={s.modelRow} onPress={showModels}>
                     <Text numberOfLines={1} style={s.name}>{name}</Text>
-                    <Image source={require('./assets/lucide/chevron_right.png')} style={s.smallIcon} />
+                    <Image source={require('../../assets/lucide/chevron_right.png')} style={s.smallIcon} />
                   </Pressable>
 
                   {values.length > 0 && (
@@ -217,7 +226,7 @@ export function EffortMenu({
                       onPress={showEffort}
                       hitSlop={8}
                     >
-                      <Image source={require('./assets/lucide/chevron_right.png')} style={[s.smallIcon, {transform: [{rotate: '180deg'}]}]} />
+                      <Image source={require('../../assets/lucide/chevron_right.png')} style={[s.smallIcon, {transform: [{rotate: '180deg'}]}]} />
                     </Pressable>
                     <Text style={s.modelsTitle}>Selecionar modelo</Text>
                     <View style={s.backButton} />
@@ -235,7 +244,7 @@ export function EffortMenu({
                         <Text style={[s.modelItemTitle, !modelId && s.modelItemTitleActive]}>Padrão</Text>
                         <Text style={s.modelItemSubtitle}>Conjunto recomendado de modelos</Text>
                       </View>
-                      {!modelId && <Image source={require('./assets/lucide/check.png')} style={s.checkIcon} />}
+                      {!modelId && <Image source={require('../../assets/lucide/check.png')} style={s.checkIcon} />}
                     </Pressable>
 
                     {filteredModels.map(item => {
@@ -255,7 +264,7 @@ export function EffortMenu({
                               {itemTitle}
                             </Text>
                           </View>
-                          {isSelected && <Image source={require('./assets/lucide/check.png')} style={s.checkIcon} />}
+                          {isSelected && <Image source={require('../../assets/lucide/check.png')} style={s.checkIcon} />}
                         </Pressable>
                       );
                     })}
@@ -274,6 +283,7 @@ export function EffortMenu({
 }
 
 function EffortSlider({values, selected, onSelect}: {values: string[]; selected: string; onSelect: (value: string) => void}) {
+  const {styles: s} = useStyles(stylesheet);
   const [preview, setPreview] = useState(Math.max(0, values.indexOf(selected)));
   const [layoutWidth, setLayoutWidth] = useState(0);
   const sliderRef = useRef<View>(null);
@@ -342,60 +352,3 @@ function EffortSlider({values, selected, onSelect}: {values: string[]; selected:
     </View>
   );
 }
-
-const s = StyleSheet.create({
-  anchor: {marginLeft: 'auto', marginRight: 8, flexShrink: 1},
-  resetButton: {width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center'},
-  trigger: {flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, minHeight: 42, borderRadius: 21},
-  name: {color: C.text, fontSize: 13, flexShrink: 1},
-  muted: {color: C.muted, fontSize: 13, flexShrink: 1},
-  smallIcon: {width: 16, height: 16, tintColor: C.muted},
-  overlay: {...StyleSheet.absoluteFillObject, zIndex: 100, elevation: 20},
-  panelFade: {
-    position: 'absolute',
-    height: 344,
-    elevation: 12,
-  },
-  panelAnchor: {position: 'absolute', left: 0, right: 0, bottom: 0},
-  panel: {
-    width: '100%',
-    height: '100%',
-    overflow: 'hidden',
-    backgroundColor: C.surface,
-    borderRadius: 26,
-    borderWidth: 1,
-    borderColor: '#FFFFFF24',
-  },
-  panelContent: {flex: 1, justifyContent: 'flex-end', paddingHorizontal: 12, paddingVertical: 8},
-  heading: {flexDirection: 'row', alignItems: 'center'},
-  previewTitle: {flex: 1, textAlign: 'center', color: '#60A5FA', fontSize: 17, fontWeight: '500'},
-  resetIcon: {width: 18, height: 18, tintColor: C.muted},
-  modelRow: {flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', minHeight: 28, marginVertical: 4},
-  slider: {height: 44, marginHorizontal: 4, justifyContent: 'center'},
-  track: {position: 'absolute', height: 22, borderRadius: 11, backgroundColor: '#414348', left: 16, right: 16},
-  fill: {position: 'absolute', height: 22, borderRadius: 11, backgroundColor: C.accent, left: 16},
-  steps: {position: 'absolute', left: 16, right: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'},
-  dot: {width: 7, height: 7, borderRadius: 4, backgroundColor: '#85878B'},
-  thumb: {position: 'absolute', width: 32, height: 32, top: 6, borderRadius: 16, backgroundColor: C.text},
-
-  modelsContainer: {paddingVertical: 4},
-  modelsHeader: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6},
-  backButton: {width: 32, height: 32, alignItems: 'center', justifyContent: 'center', borderRadius: 16},
-  modelsTitle: {color: C.muted, fontSize: 14, fontWeight: '500'},
-  modelsList: {height: 280, flexGrow: 0, flexShrink: 0},
-  modelsListContent: {paddingBottom: 4},
-  modelItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 10,
-    paddingHorizontal: 10,
-    borderRadius: 14,
-  },
-  modelItemActive: {backgroundColor: '#FFFFFF0D'},
-  modelInfo: {flex: 1, paddingRight: 8},
-  modelItemTitle: {color: C.text, fontSize: 14, fontWeight: '500'},
-  modelItemTitleActive: {color: '#FFF'},
-  modelItemSubtitle: {color: C.muted, fontSize: 11, marginTop: 2},
-  checkIcon: {width: 20, height: 20, tintColor: C.text},
-});

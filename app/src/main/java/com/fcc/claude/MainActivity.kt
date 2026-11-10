@@ -1,10 +1,12 @@
 package com.fcc.claude
 
 import android.content.Intent
+import android.graphics.Color
 import android.os.Bundle
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate
 import com.facebook.react.defaults.DefaultReactActivityDelegate
+import androidx.core.view.WindowCompat
 import org.json.JSONArray
 
 class MainActivity : ReactActivity() {
@@ -24,9 +26,9 @@ class MainActivity : ReactActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.statusBarColor = android.graphics.Color.rgb(16, 17, 19)
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        window.statusBarColor = Color.TRANSPARENT
         window.navigationBarColor = android.graphics.Color.rgb(16, 17, 19)
-        window.decorView.systemUiVisibility = 0
     }
 
     override fun onNewIntent(intent: Intent) {

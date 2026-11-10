@@ -1,21 +1,23 @@
 // Presentation and labels adapted from the original Compose ToolActivity.
 import React, {useEffect, useState} from 'react';
-import {Image, LayoutAnimation, ScrollView, StyleSheet, Text, View} from 'react-native';
-import {Pressable} from './RipplePressable';
-const C = {text: '#E9E9E7', muted: '#999B9F', surface: '#25272B'};
-export type ToolItem = {id: string; kind: string; title: string; text: string; runId: string};
-export type Run = {status: string; createdAt: number; finishedAt: number | null};
+import {Image, LayoutAnimation, Platform, ScrollView, Text, UIManager, View} from 'react-native';
+import {useStyles} from 'react-native-unistyles';
+import {Pressable} from '../Pressable/Pressable';
+import {stylesheet} from './styles';
+if (Platform.OS === 'android') UIManager.setLayoutAnimationEnabledExperimental?.(true);
+export type ToolItem = {id: string; kind: string; title: string; text: string; runId: string; complete?: boolean};
+export type Run = {status: string; createdAt: number; finishedAt: number | null; consumedTokens?: number | null};
 const actions: Record<string, string> = {"Skill": "Carregar skill", "Bash": "Executar comando", "BashOutput": "Acompanhar comando", "Read": "Ler arquivo", "FileRead": "Ler arquivo", "Write": "Gravar arquivo", "FileWrite": "Gravar arquivo", "Edit": "Editar arquivo", "FileEdit": "Editar arquivo", "MultiEdit": "Editar arquivos", "Glob": "Buscar arquivos", "Grep": "Buscar no conteúdo", "LS": "Listar arquivos", "NotebookEdit": "Editar notebook", "WebSearch": "Pesquisar na web", "WebFetch": "Abrir página", "Agent": "Executar agente", "Task": "Executar agente", "TaskOutput": "Acompanhar tarefa", "TaskCreate": "Criar tarefa", "TaskUpdate": "Atualizar tarefa", "TaskGet": "Consultar tarefa", "TaskList": "Listar tarefas", "TaskStop": "Parar tarefa", "KillShell": "Parar comando", "TodoWrite": "Atualizar lista de tarefas", "EnterPlanMode": "Entrar no modo de planejamento", "ExitPlanMode": "Concluir planejamento", "EnterWorktree": "Abrir área de trabalho isolada", "ExitWorktree": "Sair da área de trabalho isolada", "ToolSearch": "Buscar ferramentas", "ListMcpResources": "Listar recursos MCP", "ListMcpResourcesTool": "Listar recursos MCP", "ReadMcpResource": "Ler recurso MCP", "ReadMcpResourceTool": "Ler recurso MCP", "ReadMcpResourceDir": "Listar pasta MCP", "RefreshMcpTools": "Atualizar ferramentas MCP", "SendMessage": "Enviar mensagem ao agente", "TeamCreate": "Criar equipe", "TeamDelete": "Encerrar equipe", "CronCreate": "Agendar tarefa", "CronDelete": "Remover agendamento", "CronList": "Listar agendamentos", "ScheduleWakeup": "Programar retomada", "RemoteTrigger": "Gerenciar acionamento remoto", "Workflow": "Executar fluxo de trabalho", "Monitor": "Monitorar execução", "Artifact": "Gerenciar artefato", "Projects": "Gerenciar arquivos do projeto", "ClaudeDesign": "Executar ação de design", "ReportFindings": "Registrar resultados da revisão", "ProposeSkills": "Propor skills", "ProposeGoal": "Definir objetivo", "PushNotification": "Enviar notificação", "ReadNotifications": "Ler notificações", "SendFeedback": "Enviar feedback", "OfferChromeSetup": "Configurar navegador", "ShowOnboardingRolePicker": "Escolher perfil", "AskUserQuestion": "Fazer uma pergunta"};
 const labels: Record<string, string> = {"skill": "Skill", "args": "Argumentos", "arguments": "Argumentos", "command": "Comando", "file_path": "Arquivo", "notebook_path": "Notebook", "path": "Pasta", "paths": "Pastas", "pattern": "Padrão", "glob": "Arquivos", "query": "Busca", "url": "Endereço", "description": "Descrição", "prompt": "Instruções", "content": "Conteúdo", "old_string": "Antes", "new_string": "Depois", "new_source": "Novo conteúdo", "edits": "Alterações", "replace_all": "Substituir todas as ocorrências", "offset": "Início", "limit": "Limite", "pages": "Páginas", "cell_id": "Célula", "cell_type": "Tipo de célula", "edit_mode": "Operação", "output_mode": "Formato da busca", "head_limit": "Limite de resultados", "multiline": "Várias linhas", "timeout": "Tempo limite (ms)", "timeout_ms": "Tempo limite (ms)", "run_in_background": "Em segundo plano", "server": "Servidor", "uri": "Recurso", "tool": "Ferramenta", "name": "Nome", "task_id": "Tarefa", "taskId": "Tarefa", "shell_id": "Comando", "agent_id": "Agente", "subagent_type": "Tipo de agente", "team_name": "Equipe", "recipient": "Destinatário", "subject": "Tarefa", "status": "Estado", "todos": "Tarefas", "activeForm": "Em andamento", "owner": "Responsável", "model": "Modelo", "effort": "Esforço", "mode": "Modo", "action": "Ação", "operation": "Operação", "allowed_domains": "Domínios permitidos", "blocked_domains": "Domínios excluídos", "cron": "Agendamento", "recurring": "Recorrente", "durable": "Persistente", "delaySeconds": "Espera (segundos)", "reason": "Motivo", "plan": "Plano", "allowedPrompts": "Ações previstas", "metadata": "Informações adicionais", "addBlocks": "Bloqueia", "addBlockedBy": "Depende de", "findings": "Resultados"};
 const primary = ['skill','args','command','file_path','notebook_path','path','pattern','glob','query','url','subject','name','task_id','taskId','status','server','uri','recipient','subagent_type','action','operation','cron','reason'];
 const codeFields = new Set(['command','content','old_string','new_string','new_source','script','diff','skillMd']);
 const icons = {
-  terminal: require('./assets/lucide/terminal.png'), file: require('./assets/lucide/file.png'),
-  search: require('./assets/lucide/search.png'), plug: require('./assets/lucide/plug.png'),
-  zap: require('./assets/lucide/zap.png'), chevron_down: require('./assets/lucide/chevron_down.png'),
-  chevron_right: require('./assets/lucide/chevron_right.png'),
+  terminal: require('../../assets/lucide/terminal.png'), file: require('../../assets/lucide/file.png'),
+  search: require('../../assets/lucide/search.png'), plug: require('../../assets/lucide/plug.png'),
+  zap: require('../../assets/lucide/zap.png'), chevron_down: require('../../assets/lucide/chevron_down.png'),
+  chevron_right: require('../../assets/lucide/chevron_right.png'),
 };
-function Icon({name}: {name: keyof typeof icons}) {return <Image source={icons[name]} style={s.icon} />;}
+function Icon({name}: {name: keyof typeof icons}) {const {styles: s} = useStyles(stylesheet); return <Image source={icons[name]} style={s.icon} />;}
 function category(tool: string) {
   if (['Bash','BashOutput','KillShell'].includes(tool)) return 'comandos';
   if (['Read','FileRead','Write','FileWrite','Edit','FileEdit','MultiEdit','NotebookEdit'].includes(tool)) return 'arquivos';
@@ -35,6 +37,7 @@ function parse(text: string): Record<string, unknown> {
 }
 function titleCase(value: string) {return value.charAt(0).toUpperCase() + value.slice(1);}
 function Field({name, value}: {name: string; value: unknown}) {
+  const {styles: s} = useStyles(stylesheet);
   const [full, setFull] = useState(false);
   const label = labels[name] || titleCase(name.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/_/g, ' '));
   if (Array.isArray(value)) return <View style={s.field}><Text style={s.label}>{label} ({value.length})</Text><View style={s.nested}>{value.map((child, index) => name === 'todos' && child && typeof child === 'object'
@@ -48,6 +51,7 @@ function Field({name, value}: {name: string; value: unknown}) {
 }
 function status(value: string) {return ({completed:'Concluída',in_progress:'Em andamento',pending:'Pendente',deleted:'Removida'} as Record<string,string>)[value] || value;}
 export function ToolActivity({item}: {item: ToolItem}) {
+  const {styles: s} = useStyles(stylesheet);
   const [expanded, setExpanded] = useState(false);
   const input = parse(item.text);
   const keys = Object.keys(input).filter(key => input[key] != null);
@@ -57,6 +61,7 @@ export function ToolActivity({item}: {item: ToolItem}) {
   return <View><Pressable accessibilityRole="button" accessibilityState={{expanded}} onPress={() => { LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); setExpanded(!expanded); }} style={s.toolHeader}><Icon name={groupIcon([item])}/><Text numberOfLines={1} style={s.summary}>{title}{!expanded && summary ? ': ' + String(summary).replace(/\s+/g,' ') : ''}</Text><Icon name={expanded ? 'chevron_down' : 'chevron_right'} /></Pressable>{expanded && <View style={s.details}><Text style={s.label}>{item.title}</Text>{input.description != null && <Text style={s.summary}>{String(input.description)}</Text>}{keys.filter(key => key !== 'description').map(key => <Field key={key} name={key} value={input[key]}/>)}</View>}</View>;
 }
 function ToolGroup({items, active}: {items: ToolItem[]; active: boolean}) {
+  const {styles: s} = useStyles(stylesheet);
   const [expanded,setExpanded] = useState(false);
   const latest = items[items.length - 1];
   const categories = [...new Set(items.map(item => category(item.title)))];
@@ -67,7 +72,8 @@ function ToolGroup({items, active}: {items: ToolItem[]; active: boolean}) {
   const activeLabel = verb ? `${verb} ${path || 'arquivo'}` : latest.title === 'Bash' ? String(input.description || 'Executando comando') : latest.title === 'WebSearch' ? 'Pesquisando na web' : latest.title === 'WebFetch' ? 'Abrindo página' : actions[latest.title] || 'Usando ferramenta';
   return <View><Pressable accessibilityRole="button" accessibilityState={{expanded}} onPress={() => { LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); setExpanded(!expanded); }} style={s.groupHeader}><Icon name={groupIcon(active ? [latest] : items)}/><Text numberOfLines={1} style={s.summary}>{active ? activeLabel : titleCase(categories.map(kind => summaries[kind]).join(' e '))}</Text><Icon name={expanded ? 'chevron_down' : 'chevron_right'} /></Pressable>{expanded && items.map(item => <ToolActivity key={item.id} item={item}/>)}</View>;
 }
-export function WorkActivity({items, run}: {items: ToolItem[]; run?: Run}) {
+export function WorkActivity({items, run, renderMessage}: {items: ToolItem[]; run?: Run; renderMessage: (item: ToolItem) => React.ReactNode}) {
+  const {styles: s} = useStyles(stylesheet);
   const active = !!run && ['preparing','running','stopping'].includes(run.status);
   const [expanded,setExpanded] = useState(active);
   useEffect(() => {if (!active) setExpanded(false);},[active]);
@@ -75,12 +81,10 @@ export function WorkActivity({items, run}: {items: ToolItem[]; run?: Run}) {
   const duration = seconds == null ? '' : seconds >= 3600 ? `${Math.floor(seconds/3600)} h ${Math.floor(seconds%3600/60)} min ${seconds%60} s` : seconds >= 60 ? `${Math.floor(seconds/60)} min ${seconds%60} s` : `${seconds} s`;
   const parts: ToolItem[][] = [];
   for (const item of items) {const last=parts[parts.length-1]; if (item.kind === 'tool_call' && last?.[0].kind === 'tool_call') last.push(item); else parts.push([item]);}
-  return <View style={s.work}>{run && !active && <Pressable accessibilityRole="button" accessibilityState={{expanded}} onPress={() => { LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); setExpanded(!expanded); }} style={s.workHeader}><Text style={s.summary}>{duration ? `Trabalhou por ${duration}` : 'Trabalhou'}</Text><Icon name={expanded ? 'chevron_down' : 'chevron_right'}/></Pressable>}{(!run || active || expanded) && parts.map((part,index) => part[0].kind === 'tool_call' ? <ToolGroup key={part[0].id} items={part} active={active && index === parts.length-1}/> : <Reasoning key={part[0].id} item={part[0]}/>)}</View>;
+  return <View style={s.work}>{run && !active && <Pressable accessibilityRole="button" accessibilityState={{expanded}} onPress={() => { LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); setExpanded(!expanded); }} style={s.workHeader}><Text style={s.summary}>{duration ? `Trabalhou por ${duration}` : 'Trabalhou'}</Text><Icon name={expanded ? 'chevron_down' : 'chevron_right'}/></Pressable>}{(!run || active || expanded) && parts.map((part,index) => {
+    if (part[0].kind === 'tool_call') return <ToolGroup key={part[0].id} items={part} active={active && index === parts.length-1}/>;
+    if (part[0].kind === 'reasoning') return <Reasoning key={part[0].id} item={part[0]}/>;
+    return <React.Fragment key={part[0].id}>{part.map(renderMessage)}</React.Fragment>;
+  })}</View>;
 }
-function Reasoning({item}: {item: ToolItem}) {const [expanded,setExpanded] = useState(false); return <View><Pressable accessibilityRole="button" accessibilityState={{expanded}} onPress={() => { LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); setExpanded(!expanded); }} style={s.groupHeader}><Text style={s.summary}>Raciocínio</Text><Icon name={expanded ? 'chevron_down' : 'chevron_right'}/></Pressable>{expanded && <Text selectable style={s.value}>{item.text}</Text>}</View>;}
-const s = StyleSheet.create({
-  work:{paddingHorizontal:0}, workHeader:{minHeight:48,flexDirection:'row',alignItems:'center',gap:4,borderBottomWidth:1,borderBottomColor:'#999B9F73'},
-  groupHeader:{minHeight:40,flexDirection:'row',alignItems:'center',gap:8},toolHeader:{minHeight:40,flexDirection:'row',alignItems:'center',gap:10,paddingHorizontal:0,paddingVertical:4},
-  icon:{width:16,height:16,tintColor:C.muted},summary:{flex:1,color:C.muted,fontSize:13,lineHeight:19},label:{color:C.muted,fontSize:12},value:{color:C.text,fontSize:13,lineHeight:19},
-  details:{paddingHorizontal:0,paddingBottom:12,gap:8},field:{gap:5},nested:{paddingLeft:10,gap:6},codeBox:{backgroundColor:C.surface,borderRadius:10},code:{color:C.text,fontSize:12,lineHeight:18,fontFamily:'monospace',padding:10},expand:{paddingVertical:12},
-});
+function Reasoning({item}: {item: ToolItem}) {const {styles: s} = useStyles(stylesheet); const [expanded,setExpanded] = useState(false); return <View><Pressable accessibilityRole="button" accessibilityState={{expanded}} onPress={() => { LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); setExpanded(!expanded); }} style={s.groupHeader}><Text style={s.summary}>Raciocínio</Text><Icon name={expanded ? 'chevron_down' : 'chevron_right'}/></Pressable>{expanded && <Text selectable style={s.value}>{item.text}</Text>}</View>;}

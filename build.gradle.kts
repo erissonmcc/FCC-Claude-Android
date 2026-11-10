@@ -9,6 +9,7 @@ plugins {
 extra["compileSdkVersion"] = 36
 extra["minSdkVersion"] = 26
 extra["targetSdkVersion"] = 35
+extra["reactNativeAndroidRoot"] = file("node_modules/react-native")
 
 subprojects {
     plugins.withId("com.android.library") {
@@ -19,7 +20,8 @@ subprojects {
                 if (name in setOf(
                         "react-native-gesture-handler",
                         "react-native-reanimated",
-                        "react-native-worklets"
+                        "react-native-worklets",
+                        "react-native-unistyles"
                     ) &&
                     System.getenv("PREFIX")?.contains("/com.termux/files/usr") == true
                 ) {
