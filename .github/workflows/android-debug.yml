@@ -61,12 +61,7 @@ jobs:
         run: node_modules/.bin/tsc --noEmit
 
       - name: Build debug APK
-        run: >-
-          sh ./gradlew :app:assembleDebug
-          --console=plain
-          --no-daemon
-          --max-workers=4
-          -PreactNativeArchitectures=arm64-v8a
+        run: bash ./scripts/build-debug-ci.sh
 
       - name: Upload APK
         uses: actions/upload-artifact@v7
