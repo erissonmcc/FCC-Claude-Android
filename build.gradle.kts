@@ -10,6 +10,13 @@ extra["compileSdkVersion"] = 36
 extra["minSdkVersion"] = 26
 extra["targetSdkVersion"] = 35
 extra["reactNativeAndroidRoot"] = file("node_modules/react-native")
+val reactNativeArchitectures = providers.gradleProperty("reactNativeArchitectures")
+    .orNull
+    ?.split(",")
+    ?.map { it.trim() }
+    ?.filter { it.isNotEmpty() }
+    ?.toSet()
+    .orEmpty()
 
 subprojects {
     plugins.withId("com.android.library") {
@@ -17,6 +24,9 @@ subprojects {
             .finalizeDsl { android ->
                 android.compileOptions.sourceCompatibility = JavaVersion.VERSION_17
                 android.compileOptions.targetCompatibility = JavaVersion.VERSION_17
+                if (reactNativeArchitectures.isNotEmpty()) {
+                    android.defaultConfig.ndk.abiFilters.addAll(reactNativeArchitectures)
+                }
                 if (name in setOf(
                         "react-native-gesture-handler",
                         "react-native-reanimated",

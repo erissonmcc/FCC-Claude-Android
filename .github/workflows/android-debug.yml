@@ -57,6 +57,18 @@ jobs:
       - name: Install JavaScript dependencies
         run: npm ci
 
+      - name: Cache Android native and Metro outputs
+        uses: actions/cache@v6
+        with:
+          path: |
+            .metro-cache
+            node_modules/react-native-worklets/.worklets
+            app/.cxx
+            app/build/intermediates/cxx
+            node_modules/**/.cxx
+            node_modules/**/build/intermediates/cxx
+          key: ${{ runner.os }}-android-arm64-native-${{ hashFiles('package-lock.json', 'build.gradle.kts', 'app/build.gradle.kts', 'gradle.properties', 'settings.gradle.kts', 'patches/**', 'babel.config.js', 'metro.config.js') }}
+
       - name: Check TypeScript
         run: node_modules/.bin/tsc --noEmit
 
