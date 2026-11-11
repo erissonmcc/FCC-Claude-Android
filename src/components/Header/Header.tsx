@@ -14,8 +14,8 @@ const icons = {
 };
 
 type HeaderProps = {
-  title: string;
-  path: string;
+  title?: string;
+  path?: string;
   busy: boolean;
   scrollY: Animated.Value;
   onOpenDrawer: () => void;
@@ -25,7 +25,7 @@ type HeaderProps = {
   onSettings: () => void;
 };
 
-export function Header({title, path, busy, scrollY, onOpenDrawer, onNewConversation, onRefresh, onStop, onSettings}: HeaderProps) {
+export function Header({busy, scrollY, onOpenDrawer, onNewConversation, onRefresh, onStop, onSettings}: HeaderProps) {
   const {styles} = useStyles(stylesheet);
   const insets = useSafeAreaInsets();
   const backdropOpacity = scrollY.interpolate({inputRange: [0, 20, 48], outputRange: [0, 0.58, 1], extrapolate: 'clamp'});
@@ -37,10 +37,7 @@ export function Header({title, path, busy, scrollY, onOpenDrawer, onNewConversat
       <Pressable accessibilityRole="button" accessibilityLabel="Abrir conversas" onPress={onOpenDrawer} android_ripple={{color: '#FFFFFF20', radius: 24, foreground: true}} style={styles.drawerButton}>
         <Image source={icons.menu} style={styles.drawerIcon} />
       </Pressable>
-      <View style={styles.headerCenter}>
-        <Text numberOfLines={1} style={styles.headerTitle}>{title}</Text>
-        <Text numberOfLines={1} style={styles.headerPath}>{path}</Text>
-      </View>
+      <View style={styles.headerCenter} />
       <View style={styles.headerActions}>
         <Pressable accessibilityRole="button" accessibilityLabel="Nova conversa" onPress={onNewConversation} android_ripple={{color: '#FFFFFF20', radius: 24, foreground: true}} style={styles.headerAction}>
           <Image source={icons.square_pen} style={styles.headerActionIcon} />
