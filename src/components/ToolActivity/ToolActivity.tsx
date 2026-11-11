@@ -1,6 +1,7 @@
 // Presentation and labels adapted from the original Compose ToolActivity.
 import React, {useEffect, useState} from 'react';
 import {Image, LayoutAnimation, Platform, ScrollView, Text, UIManager, View} from 'react-native';
+import Animated, {useAnimatedStyle, useSharedValue, withTiming} from 'react-native-reanimated';
 import {useStyles} from 'react-native-unistyles';
 import {Pressable} from '../Pressable/Pressable';
 import {stylesheet} from './styles';
@@ -63,6 +64,10 @@ export function ToolActivity({item}: {item: ToolItem}) {
 function ToolGroup({items, active}: {items: ToolItem[]; active: boolean}) {
   const {styles: s} = useStyles(stylesheet);
   const [expanded,setExpanded] = useState(false);
+  const [contentHeight, setContentHeight] = useState(0);
+  const animatedHeight = useSharedValue(0);
+  useEffect(() => { animatedHeight.value = withTiming(expanded ? contentHeight : 0, {duration: 250}); }, [animatedHeight, contentHeight, expanded]);
+  const animatedStyle = useAnimatedStyle(() => ({height: animatedHeight.value}));
   const latest = items[items.length - 1];
   const categories = [...new Set(items.map(item => category(item.title)))];
   const summaries: Record<string,string> = {comandos:'executou comandos',arquivos:'acessou arquivos',buscas:'fez buscas',web:'acessou a web',ferramentas:'usou ferramentas'};
@@ -71,12 +76,16 @@ function ToolGroup({items, active}: {items: ToolItem[]; active: boolean}) {
   const verb = ['Read','FileRead'].includes(latest.title) ? 'Lendo' : ['Write','FileWrite'].includes(latest.title) ? 'Gravando' : ['Edit','FileEdit','MultiEdit','NotebookEdit'].includes(latest.title) ? 'Editando' : '';
   const activeLabel = verb ? `${verb} ${path || 'arquivo'}` : latest.title === 'Bash' ? String(input.description || 'Executando comando') : latest.title === 'WebSearch' ? 'Pesquisando na web' : latest.title === 'WebFetch' ? 'Abrindo página' : actions[latest.title] || 'Usando ferramenta';
   return <View>
-    <Pressable accessibilityRole="button" accessibilityState={{expanded}} android_ripple={null} onPress={() => { LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); setExpanded(value => !value); }} style={s.groupHeader}>
+    <Pressable accessibilityRole="button" accessibilityState={{expanded}} android_ripple={null} onPress={() => setExpanded(value => !value)} style={s.groupHeader}>
       <Icon name={groupIcon(active ? [latest] : items)}/>
       <Text numberOfLines={1} style={s.summary}>{active ? activeLabel : titleCase(categories.map(kind => summaries[kind]).join(' e '))}</Text>
       <Icon name={expanded ? 'chevron_down' : 'chevron_right'} />
     </Pressable>
-    {expanded && <View>{items.map(item => <ToolActivity key={item.id} item={item}/>)}</View>}
+    <Animated.View style={[{overflow: 'hidden'}, animatedStyle]} pointerEvents={expanded ? 'auto' : 'none'} accessibilityElementsHidden={!expanded} importantForAccessibility={expanded ? 'auto' : 'no-hide-descendants'}>
+      <View onLayout={event => setContentHeight(event.nativeEvent.layout.height)} style={{position: 'absolute', left: 0, right: 0}}>
+        {items.map(item => <ToolActivity key={item.id} item={item}/>)}
+      </View>
+    </Animated.View>
   </View>;
 }
 export function WorkActivity({items, run, renderMessage}: {items: ToolItem[]; run?: Run; renderMessage: (item: ToolItem) => React.ReactNode}) {
