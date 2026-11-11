@@ -498,7 +498,7 @@ export default function ChatScreen() {
         contentInsetEndAdjustment={contentInsetEndAdjustment}
         freeze={freeze}
         initialScrollAtEnd
-        keyboardLiftBehavior="never"
+        keyboardLiftBehavior="whenAtEnd"
         keyboardOffset={Math.max(0, insets.bottom - 10)}
         maintainScrollAtEnd={{animated: true}}
         maintainVisibleContentPosition
