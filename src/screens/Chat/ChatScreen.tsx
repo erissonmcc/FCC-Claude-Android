@@ -22,6 +22,7 @@ import {KeyboardStickyView} from 'react-native-keyboard-controller';
 import {KeyboardAwareLegendList, useKeyboardChatComposerInset, useKeyboardScrollToEnd} from '@legendapp/list/keyboard';
 import type {LegendListRef} from '@legendapp/list/react-native';
 import Markdown from 'react-native-markdown-display';
+import type {RenderRules} from 'react-native-markdown-display';
 import {useStyles} from 'react-native-unistyles';
 import {EffortMenu} from '../../components/EffortMenu/EffortMenu';
 import {GeneratingIndicator} from '../../components/GeneratingIndicator/GeneratingIndicator';
@@ -57,8 +58,23 @@ const markdownStyles = {
   td: {borderColor: C.line, borderWidth: 1, padding: 6},
 };
 
+function FadingTail({text}: {text: string}) {
+  const [opacity, setOpacity] = useState(0.15);
+  useEffect(() => {
+    const started = Date.now();
+    const timer = setInterval(() => {
+      const progress = Math.min(1, (Date.now() - started) / 180);
+      setOpacity(0.15 + progress * 0.85);
+      if (progress === 1) clearInterval(timer);
+    }, 34);
+    return () => clearInterval(timer);
+  }, []);
+  return <Text style={{opacity}}>{text}</Text>;
+}
+
 function StreamingMarkdown({content, complete}: {content: string; complete: boolean}) {
   const [visibleContent, setVisibleContent] = useState(() => complete ? content : '');
+  const [fadeTailLength, setFadeTailLength] = useState(0);
   const visibleRef = React.useRef(visibleContent);
   const targetRef = React.useRef(content);
   const timerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -67,11 +83,17 @@ function StreamingMarkdown({content, complete}: {content: string; complete: bool
     timerRef.current = null;
     const target = targetRef.current;
     const current = visibleRef.current;
-    if (current.length >= target.length) return;
-    const next = target.slice(0, Math.min(target.length, current.length + 8));
-    visibleRef.current = next;
-    setVisibleContent(next);
-    timerRef.current = setTimeout(revealNextBatch, 34);
+    if (current.length < target.length) {
+      const pending = Array.from(target.slice(current.length));
+      const batchSize = Math.min(256, Math.max(8, Math.ceil(pending.length / 4)));
+      const addition = pending.slice(0, batchSize).join('');
+      visibleRef.current = current + addition;
+      setFadeTailLength(addition.length);
+      setVisibleContent(visibleRef.current);
+    }
+    if (visibleRef.current.length < targetRef.current.length) {
+      timerRef.current = setTimeout(revealNextBatch, 34);
+    }
   }, []);
 
   useEffect(() => {
@@ -79,12 +101,14 @@ function StreamingMarkdown({content, complete}: {content: string; complete: bool
     const visible = visibleRef.current;
     if (complete && !content.startsWith(visible) && content !== visible) {
       visibleRef.current = content;
+      setFadeTailLength(0);
       setVisibleContent(content);
     } else if (!content.startsWith(visible)) {
       let commonLength = 0;
       while (commonLength < visible.length && commonLength < content.length && visible[commonLength] === content[commonLength]) commonLength += 1;
       const commonPrefix = content.slice(0, commonLength);
       visibleRef.current = commonPrefix;
+      setFadeTailLength(0);
       setVisibleContent(commonPrefix);
     }
     if (visibleRef.current.length < content.length && timerRef.current === null) {
@@ -94,7 +118,18 @@ function StreamingMarkdown({content, complete}: {content: string; complete: bool
 
   useEffect(() => () => {if (timerRef.current !== null) clearTimeout(timerRef.current);}, []);
 
-  return <Markdown style={markdownStyles}>{visibleContent}</Markdown>;
+  const rules = useMemo<RenderRules>(() => ({
+    text: (node, _children, _parents, styles, inheritedStyles = {}) => {
+      const value = node.content;
+      const tailLength = value && visibleContent.endsWith(value) ? Math.min(fadeTailLength, value.length) : 0;
+      return <Text key={node.key} style={[inheritedStyles, styles.text]}>
+        {tailLength ? value.slice(0, -tailLength) : value}
+        {tailLength ? <FadingTail text={value.slice(-tailLength)} /> : null}
+      </Text>;
+    },
+  }), [fadeTailLength, visibleContent]);
+
+  return <Markdown style={markdownStyles} rules={rules}>{visibleContent}</Markdown>;
 }
 
 const icons = {
