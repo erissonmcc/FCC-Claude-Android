@@ -456,7 +456,7 @@ export default function ChatScreen() {
         data={rows}
         keyExtractor={item => item.id}
         renderItem={renderItem}
-        anchoredEndSpace={anchorIndex >= 0 ? {anchorIndex, anchorOffset: 0} : undefined}
+        anchoredEndSpace={anchorIndex >= 0 ? {anchorIndex, anchorOffset: insets.top + 80} : undefined}
         alignItemsAtEnd
         contentInsetEndAdjustment={contentInsetEndAdjustment}
         freeze={freeze}
