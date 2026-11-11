@@ -416,15 +416,12 @@ export default function ChatScreen() {
   }, []);
   const onListScroll = useCallback((event: any) => {
     const {contentOffset, contentSize, layoutMeasurement} = event.nativeEvent;
+    topBarScrollY.setValue(contentOffset.y);
     isNearBottom.current = contentOffset.y + layoutMeasurement.height >= contentSize.height - 120;
     setShowLatest(!isNearBottom.current);
     setListScrolling(true);
     scheduleScrollIdle();
-  }, [scheduleScrollIdle]);
-  const animatedListScroll = useMemo(() => Animated.event(
-    [{nativeEvent: {contentOffset: {y: topBarScrollY}}}],
-    {useNativeDriver: true, listener: onListScroll},
-  ), [onListScroll, topBarScrollY]);
+  }, [scheduleScrollIdle, topBarScrollY]);
 
   if (settings) return <SettingsScreen cwd={cwd} model={model} mode={mode} effort={effort} backendUrl={backendUrl} backendToken={backendToken} message={state.bootstrap?.message} onClose={() => setSettings(false)} onChooseFolder={async () => { const selected = await FccChat.chooseProjectFolder(cwd); if (selected) setCwd(selected); }} onChangeCwd={setCwd} onChangeModel={setModel} onChangeMode={setMode} onChangeEffort={setEffort} onChangeBackendUrl={setBackendUrl} onChangeBackendToken={setBackendToken} onSave={async () => { await FccChat.configureBackend(backendUrl, backendToken); await FccChat.applySettings(cwd, model, mode, effort); await FccChat.refresh(); setSettings(false); }} />;
 
@@ -470,7 +467,7 @@ export default function ChatScreen() {
         </Pressable> : null}
         ListFooterComponent={footer}
         contentContainerStyle={[styles.messagesContent, {paddingTop: insets.top + 80, paddingBottom: 24}]}
-        onScroll={animatedListScroll}
+        onScroll={onListScroll}
         onScrollBeginDrag={() => { listDragging.current = true; anchorDisabledByUser.current = true; setAnchorId(null); onListScrollBegin(); }}
         onScrollEndDrag={() => { listDragging.current = false; scheduleScrollIdle(); }}
         onMomentumScrollBegin={onListScrollBegin}
