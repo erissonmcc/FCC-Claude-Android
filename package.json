@@ -8,6 +8,7 @@
     "postinstall": "patch-package"
   },
   "dependencies": {
+    "@animatereactnative/accordion": "0.1.5",
     "@copilotkit/react-native": "1.85.0",
     "@gorhom/bottom-sheet": "5.2.6",
     "@gorhom/portal": "1.0.14",

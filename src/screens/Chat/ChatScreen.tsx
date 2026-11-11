@@ -206,6 +206,7 @@ export default function ChatScreen() {
   const [showLatest, setShowLatest] = useState(false);
   const [listScrolling, setListScrolling] = useState(false);
   const latestOpacity = React.useRef(new Animated.Value(0)).current;
+  const topBarScrollY = React.useRef(new Animated.Value(0)).current;
   const scrollIdleTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const listDragging = React.useRef(false);
   const [composerHeight, setComposerHeight] = useState(112);
@@ -395,18 +396,17 @@ export default function ChatScreen() {
     const latestUser = [...rows].reverse().find(item => item.kind === 'user');
     if (latestUser && anchorId.current !== latestUser.id) anchorId.current = latestUser.id;
     recomputeBlankSpace();
-    requestAnimationFrame(() => scrollToLatest(false));
-  }, [blankSpace, recomputeBlankSpace, rows, scrollToLatest, state.busy]);
-  const renderAssistantMessage = useCallback((item: Item) => {
+  }, [blankSpace, recomputeBlankSpace, rows, state.busy]);
+  const renderAssistantMessage = useCallback((item: Item, inWork = false) => {
     if (!item.text) return null;
-    return <View style={styles.assistantRow}>
+    return <View style={inWork ? styles.workAssistantRow : styles.assistantRow}>
       <CopilotMarkdown content={item.text} style={markdownStyle} streamingAnimation={!item.complete} />
       {!item.complete && <View style={styles.streamMarker}><View style={styles.streamDot} /></View>}
     </View>;
   }, []);
   const renderItem = useCallback(({item}: {item: Item & {work?: Item[]}}) => {
     let content;
-    if (item.work) content = <View style={styles.assistantRow}><WorkActivity items={item.work} run={state.runs[item.runId]} renderMessage={workItem => renderAssistantMessage(workItem as Item)} /></View>;
+    if (item.work) content = <View style={styles.assistantRow}><WorkActivity items={item.work} run={state.runs[item.runId]} renderMessage={workItem => renderAssistantMessage(workItem as Item, true)} /></View>;
     else if (item.kind === 'user') content = <View style={styles.userRow}><View style={styles.userBubble}><Text selectable style={styles.userText}>{item.text}</Text></View></View>;
     else content = renderAssistantMessage(item);
     return <View onLayout={event => { rowHeights.current.set(item.id, event.nativeEvent.layout.height); recomputeBlankSpace(); }}>{content}</View>;
@@ -433,6 +433,10 @@ export default function ChatScreen() {
     setListScrolling(true);
     scheduleScrollIdle();
   }, [scheduleScrollIdle]);
+  const animatedListScroll = useMemo(() => Animated.event(
+    [{nativeEvent: {contentOffset: {y: topBarScrollY}}}],
+    {useNativeDriver: true, listener: onListScroll},
+  ), [onListScroll, topBarScrollY]);
   const onListContentSizeChange = useCallback(() => {
     recomputeBlankSpace();
     if ((isNearBottom.current || anchorId.current !== null) && !listDragging.current) scrollToLatest(false);
@@ -476,7 +480,7 @@ export default function ChatScreen() {
         contentContainerStyle={[styles.messagesContent, {paddingTop: insets.top + 80, paddingBottom: composerHeight + 24, minHeight: transcriptHeight}]}
         renderScrollComponent={renderScrollComponent}
         onLayout={event => { listHeight.current = event.nativeEvent.layout.height; recomputeBlankSpace(); }}
-        onScroll={onListScroll}
+        onScroll={animatedListScroll}
         onScrollBeginDrag={() => { listDragging.current = true; anchorId.current = null; blankSpace.value = 0; onListScrollBegin(); }}
         onScrollEndDrag={() => { listDragging.current = false; scheduleScrollIdle(); }}
         onMomentumScrollBegin={onListScrollBegin}
@@ -552,6 +556,7 @@ export default function ChatScreen() {
       title={state.session?.title || 'FCC Claude'}
       path={state.session?.cwd || cwd}
       busy={state.busy}
+      scrollY={topBarScrollY}
       onOpenDrawer={() => drawerRef.current?.openDrawer()}
       onNewConversation={() => FccChat.newSession(cwd, '', 'config', '')}
       onRefresh={() => { void FccChat.refresh(); }}

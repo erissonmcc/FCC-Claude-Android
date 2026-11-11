@@ -37,8 +37,9 @@ export function SettingsScreen({cwd, model, mode, effort, backendUrl, backendTok
         <View style={styles.card}>
         <Text style={styles.fieldLabel}>Servidor Render (URL)</Text>
         <TextInput value={backendUrl} onChangeText={onChangeBackendUrl} autoCapitalize="none" keyboardType="url" style={styles.textField} placeholder="https://seu-servidor.onrender.com" placeholderTextColor={colors.muted} />
-        <Text style={styles.fieldLabel}>Token de acesso do servidor</Text>
-        <TextInput value={backendToken} onChangeText={onChangeBackendToken} autoCapitalize="none" autoCorrect={false} secureTextEntry style={styles.textField} placeholder="Token Bearer do Render" placeholderTextColor={colors.muted} />
+        <Text style={styles.fieldLabel}>Token Admin do Render</Text>
+        <TextInput value={backendToken} onChangeText={onChangeBackendToken} autoCapitalize="none" autoCorrect={false} secureTextEntry style={styles.textField} placeholder="Cole TOKEN do fcc-render-setup.txt" placeholderTextColor={colors.muted} />
+        <Text style={styles.muted}>O app usa rotas de sessões Admin. API_TOKEN serve para clientes da API /v1.</Text>
         <Text style={styles.fieldLabel}>Pasta do projeto</Text>
         <TextInput value={cwd} onChangeText={onChangeCwd} style={styles.textField} placeholderTextColor={colors.muted} />
         <SettingAction label="Escolher pasta" tint={colors.accent} onPress={onChooseFolder} />

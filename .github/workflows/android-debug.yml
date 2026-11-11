@@ -80,6 +80,8 @@ jobs:
             node_modules/**/.cxx
             node_modules/**/build/intermediates/cxx
           key: ${{ runner.os }}-android-arm64-native-v2-${{ hashFiles('package-lock.json', 'build.gradle.kts', 'app/build.gradle.kts', 'gradle.properties', 'settings.gradle.kts', 'patches/**', 'babel.config.js', 'metro.config.js', 'app/src/main/jni/**') }}
+          restore-keys: |
+            ${{ runner.os }}-android-arm64-native-v2-
 
       - name: Check TypeScript
         run: node_modules/.bin/tsc --noEmit

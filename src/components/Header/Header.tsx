@@ -17,6 +17,7 @@ type HeaderProps = {
   title: string;
   path: string;
   busy: boolean;
+  scrollY: Animated.Value;
   onOpenDrawer: () => void;
   onNewConversation: () => void;
   onRefresh: () => void;
@@ -24,13 +25,14 @@ type HeaderProps = {
   onSettings: () => void;
 };
 
-export function Header({title, path, busy, onOpenDrawer, onNewConversation, onRefresh, onStop, onSettings}: HeaderProps) {
+export function Header({title, path, busy, scrollY, onOpenDrawer, onNewConversation, onRefresh, onStop, onSettings}: HeaderProps) {
   const {styles} = useStyles(stylesheet);
   const insets = useSafeAreaInsets();
+  const backdropOpacity = scrollY.interpolate({inputRange: [0, 20, 48], outputRange: [0, 0.58, 1], extrapolate: 'clamp'});
   return <View pointerEvents="box-none" style={styles.topBarOverlay}>
-    <View pointerEvents="none" style={styles.topBarBackdrop}>
+    <Animated.View pointerEvents="none" style={[styles.topBarBackdrop, {opacity: backdropOpacity}]}>
       <Image source={{uri: 'topbar_backdrop_fade'}} resizeMode="stretch" style={StyleSheet.absoluteFillObject} />
-    </View>
+    </Animated.View>
     <View style={[styles.topBar, {paddingTop: insets.top + 8}]}>
       <Pressable accessibilityRole="button" accessibilityLabel="Abrir conversas" onPress={onOpenDrawer} android_ripple={{color: '#FFFFFF20', radius: 24, foreground: true}} style={styles.drawerButton}>
         <Image source={icons.menu} style={styles.drawerIcon} />
