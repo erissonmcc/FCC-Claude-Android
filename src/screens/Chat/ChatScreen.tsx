@@ -67,7 +67,7 @@ const VirtualizedListScrollView = React.forwardRef<
   {...props}
   automaticallyAdjustContentInsets={false}
   contentInsetAdjustmentBehavior="never"
-  keyboardLiftBehavior="whenAtEnd"
+  keyboardLiftBehavior="never"
 />);
 
 const icons = {
@@ -219,6 +219,8 @@ export default function ChatScreen() {
   const bottomInset = React.useRef(0);
   const anchorId = React.useRef<string | null>(null);
   const rowsRef = React.useRef<(Item & {work?: Item[]})[]>([]);
+  const rowsForAutoScroll = React.useRef<(Item & {work?: Item[]})[] | null>(null);
+  const rowsChangedAt = React.useRef(0);
   const composerHeightRef = React.useRef(composerHeight);
   const listRef = React.useRef<FlatList<Item>>(null);
   const drawerRef = React.useRef<DrawerLayoutAndroid>(null);
@@ -356,6 +358,10 @@ export default function ChatScreen() {
     }
     return result;
   }, [state.items, state.runs]);
+  if (rowsForAutoScroll.current !== rows) {
+    rowsForAutoScroll.current = rows;
+    rowsChangedAt.current = Date.now();
+  }
   rowsRef.current = rows;
   composerHeightRef.current = composerHeight;
   const recomputeBlankSpace = useCallback(() => {
@@ -439,7 +445,8 @@ export default function ChatScreen() {
   ), [onListScroll, topBarScrollY]);
   const onListContentSizeChange = useCallback(() => {
     recomputeBlankSpace();
-    if ((isNearBottom.current || anchorId.current !== null) && !listDragging.current) scrollToLatest(false);
+    const rowsChangedRecently = Date.now() - rowsChangedAt.current < 300;
+    if (rowsChangedRecently && (isNearBottom.current || anchorId.current !== null) && !listDragging.current) scrollToLatest(false);
   }, [recomputeBlankSpace, scrollToLatest]);
 
   if (settings) return <SettingsScreen cwd={cwd} model={model} mode={mode} effort={effort} backendUrl={backendUrl} backendToken={backendToken} message={state.bootstrap?.message} onClose={() => setSettings(false)} onChooseFolder={async () => { const selected = await FccChat.chooseProjectFolder(cwd); if (selected) setCwd(selected); }} onChangeCwd={setCwd} onChangeModel={setModel} onChangeMode={setMode} onChangeEffort={setEffort} onChangeBackendUrl={setBackendUrl} onChangeBackendToken={setBackendToken} onSave={async () => { await FccChat.configureBackend(backendUrl, backendToken); await FccChat.applySettings(cwd, model, mode, effort); await FccChat.refresh(); setSettings(false); }} />;
