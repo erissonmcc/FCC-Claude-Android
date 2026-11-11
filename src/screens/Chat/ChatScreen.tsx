@@ -367,10 +367,11 @@ export default function ChatScreen() {
     setShowLatest(false);
     pendingDrafts.current = [];
     try {
-      const openSettings = await FccChat.sendMessage(value);
+      const sending = FccChat.sendMessage(value);
       requestAnimationFrame(() => {
         void scrollMessageToEnd({animated: true, closeKeyboard: false});
       });
+      const openSettings = await sending;
       if (openSettings === true) setSettings(true);
     } catch (error) {
       console.warn('Não foi possível enviar a mensagem', error);

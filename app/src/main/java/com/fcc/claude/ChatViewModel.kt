@@ -326,31 +326,44 @@ internal class ChatViewModel(application: Application) : AndroidViewModel(applic
             error.value = null
             return true
         }
-        val active = session.value ?: ChatRepository.createSession(cwd, bootstrap.value, effort = selectedEffort.ifEmpty { null }).also { session.value = it }
-        val epoch = bootstrap.value.optString("epoch")
-        val selected = if (queued == null) pendingAttachments.filter { it.sessionId == active.id } else emptyList()
-        val keys = selected.map { it.key }
-        val operation = if (queued != null) PendingOperation(value, emptyList(), queued.id) else {
-            pendingOperations[active.id]?.takeIf { it.text == value && it.attachmentKeys == keys }
-                ?: PendingOperation(value, keys, java.util.UUID.randomUUID().toString()).also { pendingOperations[active.id] = it }
-        }
-        val body = JSONObject().put("operation_id", operation.id)
-            .put("expected_revision", active.revision).put("expected_epoch", epoch)
-            .put("text", withChartRenderingGuidance(value))
+        val originalSession = session.value
+        val originalGeneration = detailGeneration.intValue
+        val creatingMarker = "__fcc_creating_session__"
+        var active: ChatSession? = originalSession
         val optimisticId = java.util.UUID.randomUUID().toString()
+        val clearedDraft = queued == null && draft.value == text
         turnGeneration += 1
-        sendingSessionId.value = active.id
+        sendingSessionId.value = originalSession?.id ?: creatingMarker
         activeRunId.value = ""
+        busy.value = true
+        error.value = null
+        scrollRequest.value += 1
+        anchorSessionId.value = originalSession?.id
+        items += ChatItem(optimisticId, "user", value)
+        if (clearedDraft) draft.value = ""
         try {
-            busy.value = true
-            error.value = null
-            scrollRequest.value += 1
-            anchorSessionId.value = active.id
-            items += ChatItem(optimisticId, "user", value)
+            val target = originalSession ?: ChatRepository.createSession(cwd, bootstrap.value, effort = selectedEffort.ifEmpty { null }).also {
+                active = it
+                if (session.value == null && detailGeneration.intValue == originalGeneration) {
+                    session.value = it
+                    anchorSessionId.value = it.id
+                }
+                sendingSessionId.value = it.id
+            }
+            val epoch = bootstrap.value.optString("epoch")
+            val selected = if (queued == null) pendingAttachments.filter { it.sessionId == target.id } else emptyList()
+            val keys = selected.map { it.key }
+            val operation = if (queued != null) PendingOperation(value, emptyList(), queued.id) else {
+                pendingOperations[target.id]?.takeIf { it.text == value && it.attachmentKeys == keys }
+                    ?: PendingOperation(value, keys, java.util.UUID.randomUUID().toString()).also { pendingOperations[target.id] = it }
+            }
+            val body = JSONObject().put("operation_id", operation.id)
+                .put("expected_revision", target.revision).put("expected_epoch", epoch)
+                .put("text", withChartRenderingGuidance(value))
             val ids = JSONArray()
             for (attachment in selected) {
                 val id = attachment.uploadedId ?: ChatRepository.uploadAttachment(
-                    active.id, attachment.uri, attachment.name, attachment.contentType, contentResolver,
+                    target.id, attachment.uri, attachment.name, attachment.contentType, contentResolver,
                 ).getString("attachment_id").also { uploadedId ->
                     val index = pendingAttachments.indexOfFirst { it.key == attachment.key }
                     if (index >= 0) pendingAttachments[index] = pendingAttachments[index].copy(uploadedId = uploadedId)
@@ -358,29 +371,39 @@ internal class ChatViewModel(application: Application) : AndroidViewModel(applic
                 ids.put(id)
             }
             if (ids.length() > 0) body.put("attachment_ids", ids)
-            ChatRepository.post("/admin/api/code/sessions/${active.id}/turns", body)
+            ChatRepository.post("/admin/api/code/sessions/${target.id}/turns", body)
             if (queued != null) {
                 pendingMessages.remove(queued)
                 failedQueueId.value = null
             } else {
-                if (session.value?.id == active.id && draft.value == text) draft.value = ""
-                if (session.value?.id != active.id && sessionDrafts[active.id] == text) sessionDrafts[active.id] = ""
-                pendingOperations.remove(active.id)
+                pendingOperations.remove(target.id)
                 pendingAttachments.removeAll { attachment -> selected.any { it.key == attachment.key } }
             }
         } catch (failure: Exception) {
             if (queued != null) failedQueueId.value = queued.id
-            if (session.value?.id == active.id) {
+            val targetId = active?.id
+            if (session.value?.id == targetId || (targetId == null && session.value == null)) {
                 items.removeAll { it.id == optimisticId }
                 error.value = failure.message ?: "Falha ao enviar a mensagem."
                 busy.value = false
+                if (clearedDraft) draft.value = if (draft.value.isBlank()) text else "$text\n${draft.value}"
+            } else if (clearedDraft) {
+                val restoreId = originalSession?.id ?: targetId
+                if (restoreId != null) {
+                    val currentDraft = sessionDrafts[restoreId].orEmpty()
+                    sessionDrafts[restoreId] = if (currentDraft.isBlank()) text else "$text\n$currentDraft"
+                } else {
+                    draft.value = if (draft.value.isBlank()) text else "$text\n${draft.value}"
+                    error.value = failure.message ?: "Falha ao enviar a mensagem."
+                }
             }
             return false
         } finally {
             sendingSessionId.value = null
         }
-        runCatching { loadDetail(active.id) }.onFailure {
-            if (session.value?.id == active.id) error.value = "Mensagem enviada, mas não foi possível atualizar a conversa."
+        val targetId = active?.id ?: return false
+        runCatching { loadDetail(targetId) }.onFailure {
+            if (session.value?.id == targetId) error.value = "Mensagem enviada, mas não foi possível atualizar a conversa."
         }
         return false
     }

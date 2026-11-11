@@ -1,7 +1,7 @@
 // Presentation and labels adapted from the original Compose ToolActivity.
 import React, {useEffect, useState} from 'react';
 import {Image, LayoutAnimation, Platform, ScrollView, Text, UIManager, View} from 'react-native';
-import Animated, {useAnimatedStyle, useSharedValue, withTiming} from 'react-native-reanimated';
+import Expandable from 'react-native-reanimated-animated-accordion';
 import {useStyles} from 'react-native-unistyles';
 import {Pressable} from '../Pressable/Pressable';
 import {stylesheet} from './styles';
@@ -64,10 +64,7 @@ export function ToolActivity({item}: {item: ToolItem}) {
 function ToolGroup({items, active}: {items: ToolItem[]; active: boolean}) {
   const {styles: s} = useStyles(stylesheet);
   const [expanded,setExpanded] = useState(false);
-  const [contentHeight, setContentHeight] = useState(0);
-  const animatedHeight = useSharedValue(0);
-  useEffect(() => { animatedHeight.value = withTiming(expanded ? contentHeight : 0, {duration: 250}); }, [animatedHeight, contentHeight, expanded]);
-  const animatedStyle = useAnimatedStyle(() => ({height: animatedHeight.value}));
+  const [opened, setOpened] = useState(false);
   const latest = items[items.length - 1];
   const categories = [...new Set(items.map(item => category(item.title)))];
   const summaries: Record<string,string> = {comandos:'executou comandos',arquivos:'acessou arquivos',buscas:'fez buscas',web:'acessou a web',ferramentas:'usou ferramentas'};
@@ -76,31 +73,41 @@ function ToolGroup({items, active}: {items: ToolItem[]; active: boolean}) {
   const verb = ['Read','FileRead'].includes(latest.title) ? 'Lendo' : ['Write','FileWrite'].includes(latest.title) ? 'Gravando' : ['Edit','FileEdit','MultiEdit','NotebookEdit'].includes(latest.title) ? 'Editando' : '';
   const activeLabel = verb ? `${verb} ${path || 'arquivo'}` : latest.title === 'Bash' ? String(input.description || 'Executando comando') : latest.title === 'WebSearch' ? 'Pesquisando na web' : latest.title === 'WebFetch' ? 'Abrindo página' : actions[latest.title] || 'Usando ferramenta';
   return <View>
-    <Pressable accessibilityRole="button" accessibilityState={{expanded}} android_ripple={null} onPress={() => setExpanded(value => !value)} style={s.groupHeader}>
+    <Pressable accessibilityRole="button" accessibilityState={{expanded}} android_ripple={null} onPress={() => {setOpened(true); setExpanded(value => !value);}} style={s.groupHeader}>
       <Icon name={groupIcon(active ? [latest] : items)}/>
       <Text numberOfLines={1} style={s.summary}>{active ? activeLabel : titleCase(categories.map(kind => summaries[kind]).join(' e '))}</Text>
       <Icon name={expanded ? 'chevron_down' : 'chevron_right'} />
     </Pressable>
-    <Animated.View style={[{overflow: 'hidden'}, animatedStyle]} pointerEvents={expanded ? 'auto' : 'none'} accessibilityElementsHidden={!expanded} importantForAccessibility={expanded ? 'auto' : 'no-hide-descendants'}>
-      <View onLayout={event => setContentHeight(event.nativeEvent.layout.height)} style={{position: 'absolute', left: 0, right: 0}}>
-        {items.map(item => <ToolActivity key={item.id} item={item}/>)}
+    <Expandable expanded={expanded} duration={240}>
+      <View pointerEvents={expanded ? 'auto' : 'none'} accessibilityElementsHidden={!expanded} importantForAccessibility={expanded ? 'auto' : 'no-hide-descendants'}>
+        {opened && items.map(item => <ToolActivity key={item.id} item={item}/>)}
       </View>
-    </Animated.View>
+    </Expandable>
   </View>;
 }
 export function WorkActivity({items, run, renderMessage}: {items: ToolItem[]; run?: Run; renderMessage: (item: ToolItem) => React.ReactNode}) {
   const {styles: s} = useStyles(stylesheet);
   const active = !!run && ['preparing','running','stopping'].includes(run.status);
   const [expanded,setExpanded] = useState(active);
+  const [opened,setOpened] = useState(!run || active);
+  const [outerSettled,setOuterSettled] = useState(false);
+  const showContent = !run || active || expanded;
+  useEffect(() => {if (showContent) setOpened(true);}, [showContent]);
+  useEffect(() => {
+    setOuterSettled(false);
+    if (!showContent) return;
+    const timer = setTimeout(() => setOuterSettled(true), 300);
+    return () => clearTimeout(timer);
+  }, [showContent]);
   useEffect(() => {if (!active) setExpanded(false);},[active]);
   const seconds = run?.finishedAt && run.createdAt > 0 ? Math.max(0, Math.floor((run.finishedAt - run.createdAt)/1000)) : null;
   const duration = seconds == null ? '' : seconds >= 3600 ? `${Math.floor(seconds/3600)} h ${Math.floor(seconds%3600/60)} min ${seconds%60} s` : seconds >= 60 ? `${Math.floor(seconds/60)} min ${seconds%60} s` : `${seconds} s`;
   const parts: ToolItem[][] = [];
   for (const item of items) {const last=parts[parts.length-1]; if (item.kind === 'tool_call' && last?.[0].kind === 'tool_call') last.push(item); else parts.push([item]);}
-  return <View style={s.work}>{run && !active && <Pressable accessibilityRole="button" accessibilityState={{expanded}} onPress={() => { LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); setExpanded(!expanded); }} style={s.workHeader}><Text style={s.summary}>{duration ? `Trabalhou por ${duration}` : 'Trabalhou'}</Text><Icon name={expanded ? 'chevron_down' : 'chevron_right'}/></Pressable>}{(!run || active || expanded) && parts.map((part,index) => {
+  return <View style={s.work}>{run && !active && <Pressable accessibilityRole="button" accessibilityState={{expanded}} android_ripple={null} onPress={() => {setOpened(true); setExpanded(value => !value);}} style={s.workHeader}><Text style={s.summary}>{duration ? `Trabalhou por ${duration}` : 'Trabalhou'}</Text><Icon name={expanded ? 'chevron_down' : 'chevron_right'}/></Pressable>}<Expandable expanded={showContent} expandDuration={outerSettled ? 0 : 240} collapseDuration={240}><View pointerEvents={showContent ? 'auto' : 'none'} accessibilityElementsHidden={!showContent} importantForAccessibility={showContent ? 'auto' : 'no-hide-descendants'}>{(opened || showContent) && parts.map((part,index) => {
     if (part[0].kind === 'tool_call') return <ToolGroup key={part[0].id} items={part} active={active && index === parts.length-1}/>;
     if (part[0].kind === 'reasoning') return <Reasoning key={part[0].id} item={part[0]}/>;
     return <React.Fragment key={part[0].id}>{part.map(renderMessage)}</React.Fragment>;
-  })}</View>;
+  })}</View></Expandable></View>;
 }
 function Reasoning({item}: {item: ToolItem}) {const {styles: s} = useStyles(stylesheet); const [expanded,setExpanded] = useState(false); return <View><Pressable accessibilityRole="button" accessibilityState={{expanded}} onPress={() => { LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); setExpanded(!expanded); }} style={s.groupHeader}><Text style={s.summary}>Raciocínio</Text><Icon name={expanded ? 'chevron_down' : 'chevron_right'}/></Pressable>{expanded && <Text selectable style={s.value}>{item.text}</Text>}</View>;}

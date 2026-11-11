@@ -17,6 +17,7 @@
     "react-native-keyboard-controller": "^1.23.0",
     "react-native-markdown-display": "^7.0.2",
     "react-native-reanimated": "4.3.0",
+    "react-native-reanimated-animated-accordion": "^0.6.2",
     "react-native-safe-area-context": "5.6.2",
     "react-native-streamdown": "0.1.2",
     "react-native-unistyles": "2.43.0",
