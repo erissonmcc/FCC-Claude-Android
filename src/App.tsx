@@ -6,7 +6,7 @@ import {KeyboardProvider} from 'react-native-keyboard-controller';
 import ChatScreen from './screens/Chat/ChatScreen';
 
 export default function App() {
-  return <SafeAreaProvider initialMetrics={initialWindowMetrics}>
+  return <SafeAreaProvider initialMetrics={initialWindowMetrics} style={{flex: 1, backgroundColor: '#000000'}}>
     <KeyboardProvider>
       <PortalProvider>
         <ChatScreen />
