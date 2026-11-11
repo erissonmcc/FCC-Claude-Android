@@ -197,7 +197,7 @@ export default function ChatScreen() {
   const insets = useSafeAreaInsets();
   const [drawer, setDrawer] = useState(false);
   const [settings, setSettings] = useState(false);
-  const [backendUrl, setBackendUrl] = useState('https://fcc-backend-3zwc.onrender.com');
+  const [backendUrl, setBackendUrl] = useState('https://fcc-backend-v2-sdui.onrender.com');
   const [backendToken, setBackendToken] = useState('');
   const [model, setModel] = useState('');
   const [mode, setMode] = useState('config');
