@@ -16,12 +16,12 @@ internal object ChatRepository {
     fun configure(context: android.content.Context, url: String? = null, token: String? = null) {
         val prefs = context.getSharedPreferences("fcc_backend", android.content.Context.MODE_PRIVATE)
         if (url != null && token != null) prefs.edit().putString("url", url.trimEnd('/')).putString("token", token.trim()).apply()
-        baseUrl = prefs.getString("url", "https://fcc-backend-gnis.onrender.com")!!.trimEnd('/')
+        baseUrl = prefs.getString("url", "https://fcc-backend-3zwc.onrender.com")!!.trimEnd('/')
         authToken = prefs.getString("token", "").orEmpty()
     }
 
     fun config(context: android.content.Context) = context.getSharedPreferences("fcc_backend", android.content.Context.MODE_PRIVATE).let {
-        org.json.JSONObject().put("url", it.getString("url", "https://fcc-backend-gnis.onrender.com")).put("token", it.getString("token", ""))
+        org.json.JSONObject().put("url", it.getString("url", "https://fcc-backend-3zwc.onrender.com")).put("token", it.getString("token", ""))
     }
 
     private fun authorize(connection: java.net.HttpURLConnection) {
