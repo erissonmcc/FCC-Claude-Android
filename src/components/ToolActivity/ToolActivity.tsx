@@ -1,7 +1,7 @@
 // Presentation and labels adapted from the original Compose ToolActivity.
 import React, {useEffect, useState} from 'react';
 import {Image, ScrollView, Text, View} from 'react-native';
-import Animated, {FadeIn, FadeOut, LinearTransition} from 'react-native-reanimated';
+import Animated, {Easing, LinearTransition, useAnimatedStyle, useSharedValue, withTiming} from 'react-native-reanimated';
 import {useStyles} from 'react-native-unistyles';
 import {Pressable} from '../Pressable/Pressable';
 import {stylesheet} from './styles';
@@ -50,6 +50,59 @@ function Field({name, value}: {name: string; value: unknown}) {
   return <Text selectable style={s.value}>{label}: {text}</Text>;
 }
 function status(value: string) {return ({completed:'Concluída',in_progress:'Em andamento',pending:'Pendente',deleted:'Removida'} as Record<string,string>)[value] || value;}
+
+function Accordion({
+  expanded,
+  children,
+  duration = 240,
+}: {
+  expanded: boolean;
+  children: React.ReactNode;
+  duration?: number;
+}) {
+  const height = useSharedValue(0);
+  const measured = useSharedValue(0);
+
+  useEffect(() => {
+    if (measured.value > 0) {
+      height.value = withTiming(expanded ? measured.value : 0, {
+        duration,
+        easing: Easing.bezier(0.25, 0.1, 0.25, 1),
+      });
+    }
+  }, [expanded, duration]);
+
+  const animatedStyle = useAnimatedStyle(() => {
+    return {
+      height: measured.value === 0 ? (expanded ? undefined : 0) : height.value,
+      opacity: measured.value === 0 ? (expanded ? 1 : 0) : withTiming(expanded ? 1 : 0, {duration: duration * 0.75}),
+      overflow: 'hidden',
+    };
+  });
+
+  return (
+    <Animated.View style={animatedStyle}>
+      <View
+        collapsable={false}
+        onLayout={e => {
+          const h = e.nativeEvent.layout.height;
+          if (h > 0 && Math.abs(h - measured.value) > 1) {
+            const wasZero = measured.value === 0;
+            measured.value = h;
+            if (wasZero) {
+              height.value = expanded ? h : 0;
+            } else if (expanded) {
+              height.value = withTiming(h, {duration: 160});
+            }
+          }
+        }}
+      >
+        {children}
+      </View>
+    </Animated.View>
+  );
+}
+
 export function ToolActivity({item}: {item: ToolItem}) {
   const {styles: s} = useStyles(stylesheet);
   const [expanded, setExpanded] = useState(false);
@@ -58,18 +111,20 @@ export function ToolActivity({item}: {item: ToolItem}) {
   const summaryKey = primary.find(key => keys.includes(key) && typeof input[key] !== 'object') || keys.find(key => key !== 'description' && typeof input[key] !== 'object');
   const summary = input.description || (summaryKey ? input[summaryKey] : '');
   const title = actions[item.title] || titleCase(item.title.split('__').pop()!.replace(/_/g, ' '));
-  return <Animated.View layout={LinearTransition.duration(200)}>
+  return <View>
     <Pressable accessibilityRole="button" accessibilityState={{expanded}} onPress={() => setExpanded(!expanded)} style={s.toolHeader}>
       <Icon name={groupIcon([item])}/>
       <Text numberOfLines={1} style={s.summary}>{title}{!expanded && summary ? ': ' + String(summary).replace(/\s+/g,' ') : ''}</Text>
       <Icon name={expanded ? 'chevron_down' : 'chevron_right'} />
     </Pressable>
-    {expanded && <Animated.View entering={FadeIn.duration(180)} exiting={FadeOut.duration(140)} layout={LinearTransition.duration(200)} style={s.details}>
-      <Text style={s.label}>{item.title}</Text>
-      {input.description != null && <Text style={s.summary}>{String(input.description)}</Text>}
-      {keys.filter(key => key !== 'description').map(key => <Field key={key} name={key} value={input[key]}/>)}
-    </Animated.View>}
-  </Animated.View>;
+    <Accordion expanded={expanded} duration={220}>
+      <View style={s.details}>
+        <Text style={s.label}>{item.title}</Text>
+        {input.description != null && <Text style={s.summary}>{String(input.description)}</Text>}
+        {keys.filter(key => key !== 'description').map(key => <Field key={key} name={key} value={input[key]}/>)}
+      </View>
+    </Accordion>
+  </View>;
 }
 function ToolGroup({items, active}: {items: ToolItem[]; active: boolean}) {
   const {styles: s} = useStyles(stylesheet);
@@ -81,16 +136,16 @@ function ToolGroup({items, active}: {items: ToolItem[]; active: boolean}) {
   const path = String(input.file_path || input.path || '').split('/').pop();
   const verb = ['Read','FileRead'].includes(latest.title) ? 'Lendo' : ['Write','FileWrite'].includes(latest.title) ? 'Gravando' : ['Edit','FileEdit','MultiEdit','NotebookEdit'].includes(latest.title) ? 'Editando' : '';
   const activeLabel = verb ? `${verb} ${path || 'arquivo'}` : latest.title === 'Bash' ? String(input.description || 'Executando comando') : latest.title === 'WebSearch' ? 'Pesquisando na web' : latest.title === 'WebFetch' ? 'Abrindo página' : actions[latest.title] || 'Usando ferramenta';
-  return <Animated.View layout={LinearTransition.duration(220)}>
+  return <View>
     <Pressable accessibilityRole="button" accessibilityState={{expanded}} android_ripple={null} onPress={() => setExpanded(value => !value)} style={s.groupHeader}>
       <Icon name={groupIcon(active ? [latest] : items)}/>
       <Text numberOfLines={1} style={s.summary}>{active ? activeLabel : titleCase(categories.map(kind => summaries[kind]).join(' e '))}</Text>
       <Icon name={expanded ? 'chevron_down' : 'chevron_right'} />
     </Pressable>
-    {expanded && <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(150)} layout={LinearTransition.duration(220)}>
+    <Accordion expanded={expanded} duration={240}>
       {items.map(item => <ToolActivity key={item.id} item={item}/>)}
-    </Animated.View>}
-  </Animated.View>;
+    </Accordion>
+  </View>;
 }
 export function WorkActivity({items, run, renderMessage}: {items: ToolItem[]; run?: Run; renderMessage: (item: ToolItem) => React.ReactNode}) {
   const {styles: s} = useStyles(stylesheet);
@@ -102,30 +157,30 @@ export function WorkActivity({items, run, renderMessage}: {items: ToolItem[]; ru
   const duration = seconds == null ? '' : seconds >= 3600 ? `${Math.floor(seconds/3600)} h ${Math.floor(seconds%3600/60)} min ${seconds%60} s` : seconds >= 60 ? `${Math.floor(seconds/60)} min ${seconds%60} s` : `${seconds} s`;
   const parts: ToolItem[][] = [];
   for (const item of items) {const last=parts[parts.length-1]; if (item.kind === 'tool_call' && last?.[0].kind === 'tool_call') last.push(item); else parts.push([item]);}
-  return <Animated.View layout={LinearTransition.duration(220)} style={s.work}>
+  return <View style={s.work}>
     {run && !active && <Pressable accessibilityRole="button" accessibilityState={{expanded}} android_ripple={null} onPress={() => setExpanded(value => !value)} style={s.workHeader}>
       <Text style={s.summary}>{duration ? `Trabalhou por ${duration}` : 'Trabalhou'}</Text>
       <Icon name={expanded ? 'chevron_down' : 'chevron_right'}/>
     </Pressable>}
-    {showContent && <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(150)} layout={LinearTransition.duration(220)}>
+    <Accordion expanded={showContent} duration={260}>
       {parts.map((part,index) => {
         if (part[0].kind === 'tool_call') return <ToolGroup key={part[0].id} items={part} active={active && index === parts.length-1}/>;
         if (part[0].kind === 'reasoning') return <Reasoning key={part[0].id} item={part[0]}/>;
         return <React.Fragment key={part[0].id}>{part.map(renderMessage)}</React.Fragment>;
       })}
-    </Animated.View>}
-  </Animated.View>;
+    </Accordion>
+  </View>;
 }
 function Reasoning({item}: {item: ToolItem}) {
   const {styles: s} = useStyles(stylesheet);
   const [expanded, setExpanded] = useState(false);
-  return <Animated.View layout={LinearTransition.duration(200)}>
+  return <View>
     <Pressable accessibilityRole="button" accessibilityState={{expanded}} onPress={() => setExpanded(!expanded)} style={s.groupHeader}>
       <Text style={s.summary}>Raciocínio</Text>
       <Icon name={expanded ? 'chevron_down' : 'chevron_right'}/>
     </Pressable>
-    {expanded && <Animated.View entering={FadeIn.duration(180)} exiting={FadeOut.duration(140)} layout={LinearTransition.duration(200)}>
+    <Accordion expanded={expanded} duration={220}>
       <Text selectable style={s.value}>{item.text}</Text>
-    </Animated.View>}
-  </Animated.View>;
+    </Accordion>
+  </View>;
 }
