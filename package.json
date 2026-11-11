@@ -8,7 +8,6 @@
     "postinstall": "patch-package"
   },
   "dependencies": {
-    "@animatereactnative/accordion": "0.1.5",
     "@gorhom/bottom-sheet": "5.2.6",
     "@gorhom/portal": "1.0.14",
     "@legendapp/list": "3.7.2",
