@@ -16,7 +16,7 @@ class CrashActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.statusBarColor = Color.rgb(16, 17, 19)
-        window.navigationBarColor = Color.rgb(16, 17, 19)
+        window.navigationBarColor = Color.BLACK
         val report = File(filesDir, CRASH_REPORT_FILE).takeIf(File::exists)?.readText()
             ?: "Não foi possível carregar os detalhes do erro."
         val padding = (20 * resources.displayMetrics.density).toInt()

@@ -242,6 +242,12 @@ export default function ChatScreen() {
   }, []);
 
   useEffect(() => {
+    if (!settings) return;
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => { setSettings(false); return true; });
+    return () => subscription.remove();
+  }, [settings]);
+
+  useEffect(() => {
     if (!drawer) return;
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
       drawerRef.current?.closeDrawer();
@@ -428,6 +434,8 @@ export default function ChatScreen() {
     if ((isNearBottom.current || anchorId.current !== null) && !listDragging.current) scrollToLatest(false);
   }, [recomputeBlankSpace, scrollToLatest]);
 
+  if (settings) return <SettingsScreen cwd={cwd} model={model} mode={mode} effort={effort} message={state.bootstrap?.message} onClose={() => setSettings(false)} onChooseFolder={async () => { const selected = await FccChat.chooseProjectFolder(cwd); if (selected) setCwd(selected); }} onChangeCwd={setCwd} onChangeModel={setModel} onChangeMode={setMode} onChangeEffort={setEffort} onSave={async () => { await FccChat.applySettings(cwd, model, mode, effort); setSettings(false); }} />;
+
   return <DrawerLayoutAndroid
     ref={drawerRef}
     style={styles.screen}
@@ -448,7 +456,6 @@ export default function ChatScreen() {
   >
   <SafeAreaView edges={['bottom', 'left', 'right']} style={styles.screen}>
     <StatusBar backgroundColor="transparent" barStyle="light-content" translucent />
-    {!!state.error && <Pressable onPress={() => FccChat.refresh()} style={styles.errorBanner}><Text style={styles.errorText}>{state.error}</Text></Pressable>}
     {!ready ? <View style={styles.loading}><ActivityIndicator color={C.accent} /></View> : <>
       <View style={styles.transcript} {...drawerSwipe.panHandlers} onLayout={event => setTranscriptHeight(event.nativeEvent.layout.height)}>
       <FlatList
@@ -461,7 +468,7 @@ export default function ChatScreen() {
           <Text style={styles.loadEarlierText}>{state.historyLoading ? 'Carregando mensagens…' : 'Carregar mensagens anteriores'}</Text>
         </Pressable> : null}
         ListFooterComponent={<View onLayout={event => { footerHeight.current = event.nativeEvent.layout.height; recomputeBlankSpace(); }}>{footer}</View>}
-        ListEmptyComponent={<View style={styles.emptyState}><Text style={styles.emptyTitle}>Como posso ajudar?</Text><Text style={styles.muted}>Converse com Claude sobre seu projeto.</Text></View>}
+
         contentContainerStyle={[styles.messagesContent, {paddingTop: insets.top + 80, paddingBottom: composerHeight + 24, minHeight: transcriptHeight}]}
         renderScrollComponent={renderScrollComponent}
         onLayout={event => { listHeight.current = event.nativeEvent.layout.height; recomputeBlankSpace(); }}
@@ -475,6 +482,9 @@ export default function ChatScreen() {
         removeClippedSubviews={false}
         keyboardShouldPersistTaps="handled"
       />
+      {rows.length === 0 && <View pointerEvents="none" style={[styles.emptyOverlay, {top: insets.top + 80, bottom: composerHeight + 24}]}>
+        <View style={styles.emptyState}><Text style={styles.emptyTitle}>Como posso ajudar?</Text><Text style={styles.muted}>Converse com Claude sobre seu projeto.</Text></View>
+      </View>}
       <View pointerEvents="none" style={[styles.transcriptBottomFade, {height: composerHeight + 36}]}>
         <Image source={{uri: 'transcript_bottom_fade'}} style={StyleSheet.absoluteFillObject} />
       </View>
@@ -544,7 +554,8 @@ export default function ChatScreen() {
       onStop={() => FccChat.stop()}
       onSettings={() => setSettings(true)}
     />
-    <SettingsScreen visible={settings} cwd={cwd} model={model} mode={mode} effort={effort} message={state.bootstrap?.message} onClose={() => setSettings(false)} onChooseFolder={async () => { const selected = await FccChat.chooseProjectFolder(cwd); if (selected) setCwd(selected); }} onChangeCwd={setCwd} onChangeModel={setModel} onChangeMode={setMode} onChangeEffort={setEffort} onSave={async () => { await FccChat.applySettings(cwd, model, mode, effort); setSettings(false); }} />
+    {!!state.error && <Pressable accessibilityRole="button" onPress={() => FccChat.refresh()} style={[styles.errorBanner, {top: insets.top + 80}]}><Text style={styles.errorText}>{state.error}</Text></Pressable>}
+
   </SafeAreaView>
   </DrawerLayoutAndroid>;
 }
@@ -555,16 +566,24 @@ function SessionDrawer({state, onSelect, onMenu, onNew, onSettings}: {
 }) {
   const {styles} = useStyles(stylesheet);
   return <SafeAreaView style={styles.drawer}>
-        <Text style={styles.drawerTitle}>FCC Claude</Text>
-        <Text style={styles.muted}>Seu espaço de trabalho</Text>
-        <View style={styles.drawerNew}><Pressable accessibilityRole="button" onPress={onNew} style={[styles.action, {flexDirection: 'row', gap: 8}]}><Image source={icons.square_pen} style={{width: 20, height: 20, tintColor: C.accent}}/><Text style={[styles.actionText, {color: C.accent}]}>Nova conversa</Text></Pressable></View>
-        <Text style={styles.sectionLabel}>CONVERSAS</Text>
-        <ScrollView style={styles.sessionList}>
-          {state.sessions.filter(session => session.harness === 'claude').map(session => <View key={session.id} style={[styles.sessionRow, state.session?.id === session.id && styles.sessionActive]}>
-            <Pressable android_ripple={{color: '#FFFFFF18'}} style={styles.sessionSelect} onPress={() => onSelect(session.id)}><Text numberOfLines={2} style={styles.sessionTitle}>{session.title || 'Nova conversa'}</Text></Pressable>
-            <Pressable accessibilityRole="button" accessibilityLabel={`Opções da conversa ${session.title || 'Nova conversa'}`} style={styles.action} onPress={event => onMenu(session.id, Number(event.nativeEvent.target))}><Text style={[styles.actionText, {color: C.muted}]}>⋯</Text></Pressable>
-          </View>)}
-        </ScrollView>
-        <Action label="Configurações" tint={C.text} onPress={onSettings} />
+    <View style={styles.drawerHeader}>
+      <Text style={styles.drawerTitle}>FCC Claude</Text>
+      <Pressable accessibilityRole="button" accessibilityLabel="Configurações" onPress={onSettings} android_ripple={{color: '#FFFFFF20'}} style={styles.drawerSettings}>
+        <Text style={styles.drawerSettingsIcon}>⚙</Text>
+      </Pressable>
+    </View>
+    <View style={styles.drawerDivider} />
+    <Text style={styles.sectionLabel}>Conversas</Text>
+    <ScrollView style={styles.sessionList} showsVerticalScrollIndicator={false}>
+      {state.sessions.filter(session => session.harness === 'claude').map(session => <View key={session.id} style={[styles.sessionRow, state.session?.id === session.id && styles.sessionActive]}>
+        <Pressable accessibilityRole="button" android_ripple={{color: '#FFFFFF18'}} style={styles.sessionSelect} onPress={() => onSelect(session.id)}><Text numberOfLines={1} style={styles.sessionTitle}>{session.title || 'Nova conversa'}</Text></Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel={`Opções da conversa ${session.title || 'Nova conversa'}`} style={styles.action} onPress={event => onMenu(session.id, Number(event.nativeEvent.target))}><Text style={[styles.actionText, {color: C.muted}]}>⋯</Text></Pressable>
+      </View>)}
+    </ScrollView>
+    <View style={styles.drawerFooter}>
+      <Pressable accessibilityRole="button" onPress={onNew} android_ripple={{color: '#FFFFFF20'}} style={styles.drawerNew}>
+        <Image source={icons.square_pen} style={styles.drawerNewIcon}/><Text style={styles.drawerNewText}>Nova conversa</Text>
+      </Pressable>
+    </View>
   </SafeAreaView>;
 }

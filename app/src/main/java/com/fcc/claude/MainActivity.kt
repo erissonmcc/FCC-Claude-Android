@@ -28,7 +28,7 @@ class MainActivity : ReactActivity() {
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, false)
         window.statusBarColor = Color.TRANSPARENT
-        window.navigationBarColor = android.graphics.Color.rgb(16, 17, 19)
+        window.navigationBarColor = Color.BLACK
     }
 
     override fun onNewIntent(intent: Intent) {
