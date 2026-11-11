@@ -56,28 +56,21 @@ function StreamingMarkdown({content, complete}: {content: string; complete: bool
   const accumulated = React.useRef('');
   const controlsRef = React.useRef<UseMarkdownStreamResult | null>(null);
   const initialized = React.useRef(false);
-  const finalized = React.useRef(false);
   contentRef.current = content;
   completeRef.current = complete;
 
   const applyLatestContent = useCallback((controls: UseMarkdownStreamResult) => {
     const next = contentRef.current;
     if (next !== accumulated.current) {
-      if (completeRef.current) {
-        controls.setContent(next);
-      } else if (next.startsWith(accumulated.current)) {
+      if (next.startsWith(accumulated.current)) {
         controls.appendChunk(next.slice(accumulated.current.length));
+      } else if (completeRef.current) {
+        controls.setContent(next);
       } else {
         controls.reset();
         if (next) controls.appendChunk(next);
       }
       accumulated.current = next;
-    }
-    if (completeRef.current && !finalized.current) {
-      controls.setRevealMode('chunk');
-      finalized.current = true;
-    } else if (!completeRef.current) {
-      finalized.current = false;
     }
   }, []);
   const onReady = useCallback((controls: UseMarkdownStreamResult) => {
@@ -87,7 +80,6 @@ function StreamingMarkdown({content, complete}: {content: string; complete: bool
       if (completeRef.current) {
         controls.setContent(contentRef.current);
         accumulated.current = contentRef.current;
-        finalized.current = true;
         return;
       }
     }
