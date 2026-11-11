@@ -21,8 +21,7 @@ import {SafeAreaView, useSafeAreaInsets} from 'react-native-safe-area-context';
 import {KeyboardStickyView} from 'react-native-keyboard-controller';
 import {KeyboardAwareLegendList, useKeyboardChatComposerInset, useKeyboardScrollToEnd} from '@legendapp/list/keyboard';
 import type {LegendListRef} from '@legendapp/list/react-native';
-import {MarkdownStream} from 'react-native-markdown-stream';
-import type {UseMarkdownStreamResult} from 'react-native-markdown-stream';
+import Markdown from 'react-native-markdown-display';
 import {useStyles} from 'react-native-unistyles';
 import {EffortMenu} from '../../components/EffortMenu/EffortMenu';
 import {GeneratingIndicator} from '../../components/GeneratingIndicator/GeneratingIndicator';
@@ -34,63 +33,68 @@ import {stylesheet} from './styles';
 import {SettingsScreen} from '../Settings/SettingsScreen';
 import {Header} from '../../components/Header/Header';
 
-const streamMarkdownTheme = {
-  base: 'dark' as const,
-  colors: {
-    textColor: C.text,
-    mutedTextColor: C.muted,
-    linkColor: C.accent,
-    codeBackgroundColor: C.surface,
-    codeBorderColor: C.line,
-    codeTextColor: C.text,
-    quoteBorderColor: C.accent,
-    quoteBackgroundColor: C.surface,
-    tableHeavyBorderColor: C.line,
-    tableLightBorderColor: C.line,
-  },
+const markdownStyles = {
+  body: {backgroundColor: 'transparent'},
+  text: {color: C.text, fontSize: 16, lineHeight: 24},
+  paragraph: {marginTop: 0, marginBottom: 12, flexWrap: 'wrap' as const},
+  heading1: {color: C.text, fontSize: 24, lineHeight: 30, fontWeight: '700' as const, marginTop: 12, marginBottom: 8},
+  heading2: {color: C.text, fontSize: 21, lineHeight: 27, fontWeight: '700' as const, marginTop: 10, marginBottom: 7},
+  heading3: {color: C.text, fontSize: 18, lineHeight: 24, fontWeight: '700' as const, marginTop: 8, marginBottom: 6},
+  strong: {fontWeight: '700' as const},
+  em: {fontStyle: 'italic' as const},
+  s: {textDecorationLine: 'line-through' as const},
+  link: {color: C.accent, textDecorationLine: 'underline' as const},
+  blockquote: {borderLeftWidth: 3, borderLeftColor: C.accent, paddingHorizontal: 12, marginLeft: 0, backgroundColor: C.surface},
+  code_inline: {color: C.text, backgroundColor: C.surface, fontFamily: 'monospace'},
+  code_block: {color: C.text, backgroundColor: C.surface, borderColor: C.line, borderWidth: 1, borderRadius: 10, padding: 12, fontFamily: 'monospace'},
+  fence: {color: C.text, backgroundColor: C.surface, borderColor: C.line, borderWidth: 1, borderRadius: 10, padding: 12, fontFamily: 'monospace'},
+  bullet_list: {marginTop: 0, marginBottom: 10},
+  ordered_list: {marginTop: 0, marginBottom: 10},
+  bullet_list_icon: {color: C.text},
+  ordered_list_icon: {color: C.text},
+  table: {borderColor: C.line, borderWidth: 1},
+  th: {borderColor: C.line, borderWidth: 1, padding: 6},
+  td: {borderColor: C.line, borderWidth: 1, padding: 6},
 };
 
 function StreamingMarkdown({content, complete}: {content: string; complete: boolean}) {
-  const contentRef = React.useRef(content);
-  const completeRef = React.useRef(complete);
-  const accumulated = React.useRef('');
-  const controlsRef = React.useRef<UseMarkdownStreamResult | null>(null);
-  const initialized = React.useRef(false);
-  contentRef.current = content;
-  completeRef.current = complete;
+  const [visibleContent, setVisibleContent] = useState(() => complete ? content : '');
+  const visibleRef = React.useRef(visibleContent);
+  const targetRef = React.useRef(content);
+  const timerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const applyLatestContent = useCallback((controls: UseMarkdownStreamResult) => {
-    const next = contentRef.current;
-    if (next !== accumulated.current) {
-      if (next.startsWith(accumulated.current)) {
-        controls.appendChunk(next.slice(accumulated.current.length));
-      } else if (completeRef.current) {
-        controls.setContent(next);
-      } else {
-        controls.reset();
-        if (next) controls.appendChunk(next);
-      }
-      accumulated.current = next;
-    }
+  const revealNextBatch = useCallback(() => {
+    timerRef.current = null;
+    const target = targetRef.current;
+    const current = visibleRef.current;
+    if (current.length >= target.length) return;
+    const next = target.slice(0, Math.min(target.length, current.length + 8));
+    visibleRef.current = next;
+    setVisibleContent(next);
+    timerRef.current = setTimeout(revealNextBatch, 34);
   }, []);
-  const onReady = useCallback((controls: UseMarkdownStreamResult) => {
-    controlsRef.current = controls;
-    if (!initialized.current) {
-      initialized.current = true;
-      if (completeRef.current) {
-        controls.setContent(contentRef.current);
-        accumulated.current = contentRef.current;
-        return;
-      }
-    }
-    applyLatestContent(controls);
-  }, [applyLatestContent]);
 
   useEffect(() => {
-    if (controlsRef.current) applyLatestContent(controlsRef.current);
-  }, [applyLatestContent, complete, content]);
+    targetRef.current = content;
+    const visible = visibleRef.current;
+    if (complete && !content.startsWith(visible) && content !== visible) {
+      visibleRef.current = content;
+      setVisibleContent(content);
+    } else if (!content.startsWith(visible)) {
+      let commonLength = 0;
+      while (commonLength < visible.length && commonLength < content.length && visible[commonLength] === content[commonLength]) commonLength += 1;
+      const commonPrefix = content.slice(0, commonLength);
+      visibleRef.current = commonPrefix;
+      setVisibleContent(commonPrefix);
+    }
+    if (visibleRef.current.length < content.length && timerRef.current === null) {
+      timerRef.current = setTimeout(revealNextBatch, 34);
+    }
+  }, [complete, content, revealNextBatch]);
 
-  return <MarkdownStream autoStart={false} onReady={onReady} revealMode="character" theme={streamMarkdownTheme} />;
+  useEffect(() => () => {if (timerRef.current !== null) clearTimeout(timerRef.current);}, []);
+
+  return <Markdown style={markdownStyles}>{visibleContent}</Markdown>;
 }
 
 const icons = {
