@@ -41,6 +41,7 @@ class FccChatModule(private val context: ReactApplicationContext) :
 
     init {
         context.addActivityEventListener(this)
+        ChatRepository.configure(context)
     }
 
     override fun getName() = "FccChat"
@@ -50,6 +51,20 @@ class FccChatModule(private val context: ReactApplicationContext) :
 
     @ReactMethod
     fun removeListeners(count: Int) = Unit
+
+    @ReactMethod
+    fun getBackendConfig(promise: Promise) { promise.resolve(ChatRepository.config(context).toString()) }
+
+    @ReactMethod
+    fun configureBackend(url: String, token: String, promise: Promise) {
+        val normalized = url.trim().trimEnd('/')
+        if (!normalized.startsWith("https://") && normalized != "http://127.0.0.1:8082") {
+            promise.reject("FCC_BACKEND_URL", "Use uma URL HTTPS válida para o servidor remoto.")
+            return
+        }
+        ChatRepository.configure(context, normalized, token)
+        promise.resolve(null)
+    }
 
     private fun currentModel(): ChatViewModel {
         model?.let { return it }

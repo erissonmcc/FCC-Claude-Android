@@ -115,6 +115,8 @@ const EMPTY: ChatState = {
 
 const FccChat = NativeModules.FccChat as {
   initialize(): Promise<string>;
+  getBackendConfig(): Promise<string>;
+  configureBackend(url: string, token: string): Promise<unknown>;
   refresh(): Promise<unknown>;
   setDraft(text: string): void;
   sendMessage(text: string): Promise<boolean>;
@@ -195,6 +197,8 @@ export default function ChatScreen() {
   const insets = useSafeAreaInsets();
   const [drawer, setDrawer] = useState(false);
   const [settings, setSettings] = useState(false);
+  const [backendUrl, setBackendUrl] = useState('https://fcc-backend-gnis.onrender.com');
+  const [backendToken, setBackendToken] = useState('');
   const [model, setModel] = useState('');
   const [mode, setMode] = useState('config');
   const [effort, setEffort] = useState('');
@@ -295,7 +299,7 @@ export default function ChatScreen() {
   useEffect(() => {
     const emitter = new NativeEventEmitter(NativeModules.FccChat);
     const subscription = emitter.addListener('fccStateChanged', applySnapshot);
-    FccChat.initialize().then(applySnapshot).catch(error => setState(prev => ({...prev, error: String(error)}))).finally(() => setReady(true));
+    FccChat.getBackendConfig().then(raw => { const config = JSON.parse(raw); setBackendUrl(config.url); setBackendToken(config.token); }).finally(() => FccChat.initialize().then(applySnapshot).catch(error => setState(prev => ({...prev, error: String(error)}))).finally(() => setReady(true)));
     return () => subscription.remove();
   }, [applySnapshot]);
 
@@ -434,7 +438,7 @@ export default function ChatScreen() {
     if ((isNearBottom.current || anchorId.current !== null) && !listDragging.current) scrollToLatest(false);
   }, [recomputeBlankSpace, scrollToLatest]);
 
-  if (settings) return <SettingsScreen cwd={cwd} model={model} mode={mode} effort={effort} message={state.bootstrap?.message} onClose={() => setSettings(false)} onChooseFolder={async () => { const selected = await FccChat.chooseProjectFolder(cwd); if (selected) setCwd(selected); }} onChangeCwd={setCwd} onChangeModel={setModel} onChangeMode={setMode} onChangeEffort={setEffort} onSave={async () => { await FccChat.applySettings(cwd, model, mode, effort); setSettings(false); }} />;
+  if (settings) return <SettingsScreen cwd={cwd} model={model} mode={mode} effort={effort} backendUrl={backendUrl} backendToken={backendToken} message={state.bootstrap?.message} onClose={() => setSettings(false)} onChooseFolder={async () => { const selected = await FccChat.chooseProjectFolder(cwd); if (selected) setCwd(selected); }} onChangeCwd={setCwd} onChangeModel={setModel} onChangeMode={setMode} onChangeEffort={setEffort} onChangeBackendUrl={setBackendUrl} onChangeBackendToken={setBackendToken} onSave={async () => { await FccChat.configureBackend(backendUrl, backendToken); await FccChat.applySettings(cwd, model, mode, effort); await FccChat.refresh(); setSettings(false); }} />;
 
   return <DrawerLayoutAndroid
     ref={drawerRef}

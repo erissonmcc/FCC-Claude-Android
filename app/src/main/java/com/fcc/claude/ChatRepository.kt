@@ -10,7 +10,23 @@ import java.io.IOException
 import java.util.UUID
 
 internal object ChatRepository {
-    private const val baseUrl = "http://127.0.0.1:8082"
+    @Volatile private var baseUrl = "http://127.0.0.1:8082"
+    @Volatile private var authToken = ""
+
+    fun configure(context: android.content.Context, url: String? = null, token: String? = null) {
+        val prefs = context.getSharedPreferences("fcc_backend", android.content.Context.MODE_PRIVATE)
+        if (url != null && token != null) prefs.edit().putString("url", url.trimEnd('/')).putString("token", token.trim()).apply()
+        baseUrl = prefs.getString("url", "https://fcc-backend-gnis.onrender.com")!!.trimEnd('/')
+        authToken = prefs.getString("token", "").orEmpty()
+    }
+
+    fun config(context: android.content.Context) = context.getSharedPreferences("fcc_backend", android.content.Context.MODE_PRIVATE).let {
+        org.json.JSONObject().put("url", it.getString("url", "https://fcc-backend-gnis.onrender.com")).put("token", it.getString("token", ""))
+    }
+
+    private fun authorize(connection: java.net.HttpURLConnection) {
+        if (authToken.isNotBlank()) connection.setRequestProperty("Authorization", "Bearer $authToken")
+    }
 
     suspend fun get(path: String): JSONObject = request("GET", path, null)
     suspend fun post(path: String, body: JSONObject): JSONObject = request("POST", path, body)
@@ -23,6 +39,7 @@ internal object ChatRepository {
         connection.readTimeout = 30000
         connection.doOutput = true
         connection.setRequestProperty("Accept", "application/json")
+        authorize(connection)
         connection.setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
         connection.setChunkedStreamingMode(64 * 1024)
         val safeType = contentType.takeIf { it.matches(Regex("[A-Za-z0-9!#$&^_.+-]+/[A-Za-z0-9!#$&^_.+-]+")) } ?: "application/octet-stream"
@@ -50,6 +67,7 @@ internal object ChatRepository {
         connection.connectTimeout = 3000
         connection.readTimeout = 30000
         connection.setRequestProperty("Accept", "text/event-stream")
+        authorize(connection)
         connection.setRequestProperty("Cache-Control", "no-cache")
         try {
             if (connection.responseCode !in 200..299) throw IOException("FCC event feed unavailable")
@@ -105,6 +123,7 @@ internal object ChatRepository {
         connection.connectTimeout = 3000
         connection.readTimeout = 10000
         connection.setRequestProperty("Accept", "application/json")
+        authorize(connection)
         if (body != null) {
             connection.doOutput = true
             connection.setRequestProperty("Content-Type", "application/json; charset=utf-8")

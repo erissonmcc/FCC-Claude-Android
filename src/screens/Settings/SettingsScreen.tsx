@@ -11,6 +11,8 @@ type Props = {
   model: string;
   mode: string;
   effort: string;
+  backendUrl: string;
+  backendToken: string;
   message?: string;
   onClose: () => void;
   onChooseFolder: () => void;
@@ -18,10 +20,12 @@ type Props = {
   onChangeModel: (value: string) => void;
   onChangeMode: (value: string) => void;
   onChangeEffort: (value: string) => void;
+  onChangeBackendUrl: (value: string) => void;
+  onChangeBackendToken: (value: string) => void;
   onSave: () => void;
 };
 
-export function SettingsScreen({cwd, model, mode, effort, message, onClose, onChooseFolder, onChangeCwd, onChangeModel, onChangeMode, onChangeEffort, onSave}: Props) {
+export function SettingsScreen({cwd, model, mode, effort, backendUrl, backendToken, message, onClose, onChooseFolder, onChangeCwd, onChangeModel, onChangeMode, onChangeEffort, onChangeBackendUrl, onChangeBackendToken, onSave}: Props) {
   const {styles} = useStyles(stylesheet);
   return <SafeAreaView style={styles.screen}>
       <View style={styles.header}>
@@ -31,6 +35,10 @@ export function SettingsScreen({cwd, model, mode, effort, message, onClose, onCh
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Text style={styles.section}>Projeto</Text>
         <View style={styles.card}>
+        <Text style={styles.fieldLabel}>Servidor Render (URL)</Text>
+        <TextInput value={backendUrl} onChangeText={onChangeBackendUrl} autoCapitalize="none" keyboardType="url" style={styles.textField} placeholder="https://seu-servidor.onrender.com" placeholderTextColor={colors.muted} />
+        <Text style={styles.fieldLabel}>Token de acesso do servidor</Text>
+        <TextInput value={backendToken} onChangeText={onChangeBackendToken} autoCapitalize="none" autoCorrect={false} secureTextEntry style={styles.textField} placeholder="Token Bearer do Render" placeholderTextColor={colors.muted} />
         <Text style={styles.fieldLabel}>Pasta do projeto</Text>
         <TextInput value={cwd} onChangeText={onChangeCwd} style={styles.textField} placeholderTextColor={colors.muted} />
         <SettingAction label="Escolher pasta" tint={colors.accent} onPress={onChooseFolder} />
