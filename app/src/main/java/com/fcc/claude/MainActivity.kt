@@ -13,7 +13,7 @@ class MainActivity : ReactActivity() {
     override fun getMainComponentName() = "FccClaude"
 
     internal val launchCwd: String
-        get() = intent.getStringExtra("fcc_cwd") ?: "/storage/emulated/0"
+        get() = intent.getStringExtra("fcc_cwd") ?: ChatRepository.defaultWorkingDirectory()
 
     internal val launchOptions: LaunchOptions
         get() = parseLaunchOptions(intent)

@@ -53,7 +53,10 @@ class FccChatModule(private val context: ReactApplicationContext) :
     fun removeListeners(count: Int) = Unit
 
     @ReactMethod
-    fun getBackendConfig(promise: Promise) { promise.resolve(ChatRepository.config(context).toString()) }
+    fun getBackendConfig(promise: Promise) {
+        ChatRepository.configure(context)
+        promise.resolve(ChatRepository.config(context).toString())
+    }
 
     @ReactMethod
     fun configureBackend(url: String, token: String, promise: Promise) {
@@ -85,7 +88,7 @@ class FccChatModule(private val context: ReactApplicationContext) :
         val viewModel = runCatching { currentModel() }.getOrElse { promise.reject("FCC_INIT", it); return }
         scope.launch {
             try {
-                val cwd = activity?.launchCwd ?: "/storage/emulated/0"
+                val cwd = activity?.launchCwd ?: ChatRepository.defaultWorkingDirectory()
                 val options = activity?.launchOptions ?: LaunchOptions()
                 val launchPrompt = activity?.launchPrompt
                 val prompt = viewModel.refresh(cwd, options, launchPrompt)
@@ -113,7 +116,7 @@ class FccChatModule(private val context: ReactApplicationContext) :
     @ReactMethod
     fun refresh(promise: Promise) = runWithModel(promise) { vm ->
         val activity = context.currentActivity as? MainActivity
-        vm.refresh(activity?.launchCwd ?: vm.session.value?.cwd ?: "/storage/emulated/0", activity?.launchOptions ?: LaunchOptions(), null)
+        vm.refresh(activity?.launchCwd ?: vm.session.value?.cwd ?: ChatRepository.defaultWorkingDirectory(), activity?.launchOptions ?: LaunchOptions(), null)
         null
     }
 
@@ -124,7 +127,7 @@ class FccChatModule(private val context: ReactApplicationContext) :
 
     @ReactMethod
     fun sendMessage(text: String, promise: Promise) = runWithModel(promise) { vm ->
-        val cwd = vm.session.value?.cwd ?: (context.currentActivity as? MainActivity)?.launchCwd ?: "/storage/emulated/0"
+        val cwd = vm.session.value?.cwd ?: (context.currentActivity as? MainActivity)?.launchCwd ?: ChatRepository.defaultWorkingDirectory()
         vm.sendMessage(text, null, cwd, vm.session.value?.reasoningEffort.orEmpty(), context.contentResolver)
     }
 

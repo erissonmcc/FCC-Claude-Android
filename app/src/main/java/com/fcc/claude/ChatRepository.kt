@@ -20,6 +20,9 @@ internal object ChatRepository {
         authToken = prefs.getString("token", "").orEmpty()
     }
 
+    fun defaultWorkingDirectory(): String =
+        if (baseUrl.startsWith("https://")) "/opt/render/project/src/data/workspace" else "/storage/emulated/0"
+
     fun config(context: android.content.Context) = context.getSharedPreferences("fcc_backend", android.content.Context.MODE_PRIVATE).let {
         org.json.JSONObject().put("url", it.getString("url", "https://fcc-backend-v2-sdui.onrender.com")).put("token", it.getString("token", ""))
     }
