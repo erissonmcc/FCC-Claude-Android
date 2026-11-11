@@ -57,7 +57,6 @@ jobs:
         run: |
           yes | sdkmanager --licenses > /dev/null
           sdkmanager --install \
-            "platform-tools" \
             "platforms;android-36" \
             "build-tools;36.0.0" \
             "cmake;3.22.1" \
@@ -73,19 +72,41 @@ jobs:
         uses: actions/cache@v6
         with:
           path: |
+            .gradle
             .metro-cache
             node_modules/react-native-worklets/.worklets
             app/.cxx
             app/build/intermediates/cxx
             node_modules/**/.cxx
             node_modules/**/build/intermediates/cxx
-          key: ${{ runner.os }}-android-arm64-native-${{ hashFiles('package-lock.json', 'build.gradle.kts', 'app/build.gradle.kts', 'gradle.properties', 'settings.gradle.kts', 'patches/**', 'babel.config.js', 'metro.config.js') }}
+          key: ${{ runner.os }}-android-arm64-native-v2-${{ hashFiles('package-lock.json', 'build.gradle.kts', 'app/build.gradle.kts', 'gradle.properties', 'settings.gradle.kts', 'patches/**', 'babel.config.js', 'metro.config.js', 'app/src/main/jni/**') }}
 
       - name: Check TypeScript
         run: node_modules/.bin/tsc --noEmit
 
       - name: Build debug APK
         run: bash ./scripts/build-debug-ci.sh
+
+      - name: Sign APK with persistent debug key
+        if: github.event_name != 'pull_request'
+        run: |
+          apk="app/build/outputs/apk/debug/app-debug.apk"
+          signer="$ANDROID_HOME/build-tools/36.0.0/apksigner"
+          signed_apk="$RUNNER_TEMP/app-debug-stable.apk"
+          "$signer" sign \
+            --ks "$HOME/.android/debug.keystore" \
+            --ks-key-alias androiddebugkey \
+            --ks-pass pass:android \
+            --key-pass pass:android \
+            --out "$signed_apk" \
+            "$apk"
+          mv "$signed_apk" "$apk"
+          cert_sha256=$("$signer" verify --print-certs "$apk" | sed -n 's/.*SHA-256 digest: //p' | tr -d ':')
+          if [[ "$cert_sha256" != "eea72b2a3957fb0fc5dc6e2eb2c70a016b2c2f76978fbee8a3c06319d3cedf04" ]]; then
+            echo "::error::APK was not signed with the persistent installed key."
+            exit 1
+          fi
+          echo "APK signature matches the installed debug key."
 
       - name: Upload APK
         uses: actions/upload-artifact@v7
