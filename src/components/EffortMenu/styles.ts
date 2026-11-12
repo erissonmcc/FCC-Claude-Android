@@ -27,7 +27,6 @@ export const stylesheet = createStyleSheet(theme => ({
   panelContent: {flex: 1, justifyContent: 'flex-end', paddingHorizontal: theme.spacing.md, paddingVertical: theme.spacing.sm},
   heading: {flexDirection: 'row', alignItems: 'center'},
   previewTitle: {flex: 1, textAlign: 'center', fontSize: theme.typography.lg, fontWeight: '500'},
-  previewPrefix: {color: theme.colors.muted},
   previewValue: {color: '#1683FF'},
   resetIcon: {width: 18, height: 18, tintColor: theme.colors.muted},
   modelRow: {flexDirection: 'row', gap: theme.spacing.sm, alignItems: 'center', justifyContent: 'center', minHeight: 28, marginVertical: theme.spacing.xs},
@@ -36,7 +35,7 @@ export const stylesheet = createStyleSheet(theme => ({
   fill: {position: 'absolute', height: 32, top: 6, borderRadius: 16, backgroundColor: '#1683FFDC', left: 16, zIndex: 1},
   steps: {position: 'absolute', left: 16, right: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', zIndex: 2, elevation: 2},
   dot: {width: 7, height: 7, borderRadius: 4, backgroundColor: '#FFFFFF', opacity: 0.62},
-  thumb: {position: 'absolute', width: 28, height: 28, top: 8, borderRadius: 14, backgroundColor: theme.colors.text, zIndex: 3, elevation: 3},
+  thumb: {position: 'absolute', width: 28, height: 28, top: 8, borderRadius: 14, backgroundColor: theme.colors.text, borderWidth: 2, borderColor: '#1683FF', zIndex: 3, elevation: 3},
 
   modelsContainer: {paddingVertical: theme.spacing.xs},
   modelsHeader: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6},

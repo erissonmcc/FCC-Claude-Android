@@ -17,6 +17,7 @@ export function ApprovalMenu({mode, onSelectMode}: {mode: string; onSelectMode: 
   const [visible, setVisible] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [keyboardSettled, setKeyboardSettled] = useState(true);
+  const [panelHeight, setPanelHeight] = useState(340);
   const [position, setPosition] = useState<{left: number; bottom: number; width: number} | null>(null);
   const opacity = useRef(new Animated.Value(0)).current;
   const triggerRef = useRef<View>(null);
@@ -68,6 +69,7 @@ export function ApprovalMenu({mode, onSelectMode}: {mode: string; onSelectMode: 
     setKeyboardSettled(!keyboardVisible);
     opacity.setValue(0);
     setPosition(null);
+    setPanelHeight(340);
     setMounted(true);
     setVisible(true);
     if (keyboardVisible) requestAnimationFrame(() => requestAnimationFrame(() => positionMenu(() => setKeyboardSettled(true))));
@@ -82,9 +84,12 @@ export function ApprovalMenu({mode, onSelectMode}: {mode: string; onSelectMode: 
     {mounted && <Portal>
       <View ref={overlayRef} collapsable={false} style={s.overlay} onLayout={() => positionMenu()}>
         <NativePressable accessibilityLabel="Fechar seletor de aprovação" style={StyleSheet.absoluteFill} onPress={() => setVisible(false)} />
-        <Animated.View pointerEvents={visible ? 'auto' : 'none'} style={[s.panelFade, position, {opacity}]}>
+        <Animated.View pointerEvents={visible ? 'auto' : 'none'} style={[s.panelFade, position, {opacity, height: panelHeight}]}>
           <View style={s.panel}>
-            <View style={s.content}>
+            <View style={s.content} onLayout={event => {
+              const measuredHeight = event.nativeEvent.layout.height;
+              setPanelHeight(previous => Math.abs(previous - measuredHeight) > 1 ? measuredHeight : previous);
+            }}>
               <View style={s.heading}>
                 <Text style={s.headingText}>Como as ações do Claude devem ser aprovadas?</Text>
                 <Pressable accessibilityRole="button" onPress={() => Alert.alert('Aprovação das ações', 'Escolha quanto controle o Claude precisa ter para usar ferramentas, acessar a internet e alterar arquivos nesta sessão.')}>

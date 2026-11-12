@@ -1,6 +1,7 @@
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import { StyleSheet, 
   ActivityIndicator,
+  Alert,
   Animated,
   BackHandler,
   DrawerLayoutAndroid,
@@ -25,6 +26,7 @@ import type {RenderRules} from 'react-native-markdown-display';
 import { useStyles} from 'react-native-unistyles';
 import { EffortMenu} from '../../components/EffortMenu/EffortMenu';
 import { ApprovalMenu} from '../../components/ApprovalMenu/ApprovalMenu';
+import { ContextMenu, ContextMenuDots } from '../../components/ContextMenu/ContextMenu';
 import { GeneratingIndicator} from '../../components/GeneratingIndicator/GeneratingIndicator';
 import { Pressable} from '../../components/Pressable/Pressable';
 import { WorkActivity, type Run} from '../../components/ToolActivity/ToolActivity';
@@ -144,7 +146,12 @@ const icons = {
 };
 function IconButton({icon, label, onPress, disabled = false, filled = false, buttonStyle, rippleRadius}: {icon: keyof typeof icons; label: string; onPress: () => void; disabled?: boolean; filled?: boolean; buttonStyle?: StyleProp<ViewStyle>; rippleRadius?: number}) {
   const {styles} = useStyles(stylesheet);
-  return <Pressable accessibilityRole="button" accessibilityLabel={label} disabled={disabled} onPress={onPress} android_ripple={{color: filled ? '#00000024' : '#FFFFFF20', foreground: true, radius: rippleRadius}} style={[styles.action, buttonStyle, filled && styles.sendButton, filled && disabled && styles.sendDisabled]}><Image source={icons[icon]} style={{width: 22, height: 22, tintColor: filled ? (disabled ? C.muted : C.backdrop) : C.muted}} /></Pressable>;
+  const iconColor = filled ? (disabled ? C.muted : C.backdrop) : C.muted;
+  return <Pressable accessibilityRole="button" accessibilityLabel={label} disabled={disabled} onPress={onPress} android_ripple={{color: filled ? '#00000024' : '#FFFFFF20', foreground: true, radius: rippleRadius}} style={[styles.action, buttonStyle, filled && styles.sendButton, filled && disabled && styles.sendDisabled]}>
+    {icon === 'square'
+      ? <View style={{width: 14, height: 14, borderRadius: 2, backgroundColor: iconColor}} />
+      : <Image source={icons[icon]} style={{width: 22, height: 22, tintColor: iconColor}} />}
+  </Pressable>;
 }
 
 type Session = {
@@ -155,6 +162,7 @@ type Item = {
   id: string; kind: string; text: string; title: string; complete: boolean;
   runId: string; ordinal: number; sequence: number;
 };
+type OptimisticMessage = {item: Item; sessionId: string | null};
 type Prompt = {id: string; tool: string; input: Record<string, any>};
 type Attachment = {key: string; sessionId: string; name: string; contentType: string; uploaded: boolean};
 type ChatState = {
@@ -180,11 +188,11 @@ const FccChat = NativeModules.FccChat as {
   configureBackend(url: string, token: string): Promise<unknown>;
   refresh(): Promise<unknown>;
   setDraft(text: string): void;
-  sendMessage(text: string): Promise<boolean>;
+  sendMessage(text: string, clientMessageId: string): Promise<boolean>;
   stop(): Promise<unknown>;
   newSession(cwd: string, model: string, mode: string, effort: string): Promise<unknown>;
   selectSession(id: string): Promise<unknown>;
-  showSessionMenu(id: string, viewTag: number): Promise<unknown>;
+  deleteSession(id: string): Promise<unknown>;
   applySettings(cwd: string, model: string, mode: string, effort: string): Promise<unknown>;
   chooseProjectFolder(path: string): Promise<string | null>;
   respondPrompt(id: string, approved: boolean, answers?: string | null): Promise<unknown>;
@@ -268,6 +276,7 @@ export default function ChatScreen({cwd: initialCwd, model: initialModel, mode: 
   const {styles} = useStyles(stylesheet);
   const [ready, setReady] = useState(false);
   const [state, setState] = useState<ChatState>(EMPTY);
+  const [optimisticMessages, setOptimisticMessages] = useState<OptimisticMessage[]>([]);
   const [localCwd, setLocalCwd] = useState(initialCwd);
   const [localModel, setLocalModel] = useState(initialModel);
   const [localMode, setLocalMode] = useState(initialMode);
@@ -355,6 +364,21 @@ export default function ChatScreen({cwd: initialCwd, model: initialModel, mode: 
       if (changedSession) pendingDrafts.current = [];
       const acknowledged = pendingDrafts.current.lastIndexOf(next.draft);
       if (acknowledged >= 0) pendingDrafts.current.splice(0, acknowledged + 1);
+      if (next.error && !next.sending) pendingDrafts.current = [];
+      const serverIds = new Set(next.items.map(item => item.id));
+      const queuedTexts = [...next.pendingMessages, ...next.runMessages]
+        .filter(message => message.sessionId === next.session?.id)
+        .map(message => message.text);
+      setOptimisticMessages(previous => {
+        const remaining = previous.filter(message => {
+          if (serverIds.has(message.item.id)) return false;
+          if (message.sessionId && message.sessionId !== next.session?.id) return false;
+          if (queuedTexts.includes(message.item.text)) return false;
+          if (next.error && !next.sending) return false;
+          return true;
+        });
+        return remaining.length === previous.length ? previous : remaining;
+      });
       setState(previous => ({...next, draft: pendingDrafts.current.length ? previous.draft : next.draft}));
       if (next.session?.cwd) {
         const cfg = {cwd: next.session.cwd, model: next.session.model ?? '', mode: next.session.mode || 'config', effort: next.session.reasoningEffort ?? '', backendUrl: localBackendUrl, backendToken: localBackendToken};
@@ -383,17 +407,29 @@ export default function ChatScreen({cwd: initialCwd, model: initialModel, mode: 
     anchorDisabledByUser.current = false;
     setShowLatest(false);
     pendingDrafts.current = [];
+    const clientMessageId = `rn-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const isModelCommand = value.trim().toLowerCase() === '/model';
+    if (!isModelCommand) {
+      const text = value.trim();
+      setOptimisticMessages(previous => [...previous, {
+        sessionId: state.session?.id ?? null,
+        item: {id: clientMessageId, kind: 'user', text, title: '', complete: true, runId: '', ordinal: Number.MAX_SAFE_INTEGER, sequence: Number.MAX_SAFE_INTEGER},
+      }]);
+      pendingDrafts.current.push('');
+      setState(previous => ({...previous, draft: ''}));
+    }
     try {
-      const sending = FccChat.sendMessage(value);
+      const sending = FccChat.sendMessage(value, clientMessageId);
       requestAnimationFrame(() => {
-        void scrollMessageToEnd({animated: true, closeKeyboard: false});
+        void scrollMessageToEnd({animated: true, closeKeyboard: true});
       });
       const openSettings = await sending;
       if (openSettings === true) onSettings();
     } catch (error) {
+      setOptimisticMessages(previous => previous.filter(message => message.item.id !== clientMessageId));
       console.warn('Não foi possível enviar a mensagem', error);
     }
-  }, [onSettings, scrollMessageToEnd, state.draft]);
+  }, [onSettings, scrollMessageToEnd, state.draft, state.session?.id]);
 
   const currentAttachments = state.attachments.filter(item => item.sessionId === state.session?.id);
 
@@ -405,34 +441,46 @@ export default function ChatScreen({cwd: initialCwd, model: initialModel, mode: 
     {!!state.historyError && <Text style={styles.errorText}>{state.historyError}</Text>}
   </View>;
 
+  const visibleItems = useMemo(() => {
+    const serverIds = new Set(state.items.map(item => item.id));
+    const queuedTexts = [...state.pendingMessages, ...state.runMessages]
+      .filter(message => message.sessionId === state.session?.id)
+      .map(message => message.text);
+    return [...state.items, ...optimisticMessages
+      .filter(message => !serverIds.has(message.item.id) &&
+        (!message.sessionId || message.sessionId === state.session?.id) &&
+        !queuedTexts.includes(message.item.text))
+      .map(message => message.item)];
+  }, [optimisticMessages, state.items, state.pendingMessages, state.runMessages, state.session?.id]);
+
   const rows = useMemo(() => {
     const result: (Item & {work?: Item[]})[] = [];
     let index = 0;
-    while (index < state.items.length) {
-      const item = state.items[index];
+    while (index < visibleItems.length) {
+      const item = visibleItems[index];
       const run = state.runs[item.runId];
       let end = index;
       if (run && item.kind !== 'user') {
-        while (end < state.items.length && state.items[end].runId === item.runId && state.items[end].kind !== 'user') end++;
+        while (end < visibleItems.length && visibleItems[end].runId === item.runId && visibleItems[end].kind !== 'user') end++;
       }
       let lastTool = -1;
       for (let cursor = index; cursor < end; cursor++) {
-        if (state.items[cursor].kind === 'tool_call') lastTool = cursor;
+        if (visibleItems[cursor].kind === 'tool_call') lastTool = cursor;
       }
       if (run && lastTool >= index) {
-        result.push({...item, id: `work:${item.runId}:${item.id}`, work: state.items.slice(index, lastTool + 1)});
+        result.push({...item, id: `work:${item.runId}:${item.id}`, work: visibleItems.slice(index, lastTool + 1)});
         index = lastTool + 1;
       } else if (item.kind === 'tool_call') {
         const start = index;
-        while (index < state.items.length && state.items[index].kind === 'tool_call') index++;
-        result.push({...item, id: `tools:${item.id}`, work: state.items.slice(start, index)});
+        while (index < visibleItems.length && visibleItems[index].kind === 'tool_call') index++;
+        result.push({...item, id: `tools:${item.id}`, work: visibleItems.slice(start, index)});
       } else {
         result.push(item);
         index++;
       }
     }
     return result;
-  }, [state.items, state.runs]);
+  }, [visibleItems, state.runs]);
   const scrollToLatest = useCallback((animated: boolean) => {
     void listRef.current?.scrollToEnd({animated});
   }, []);
@@ -457,12 +505,20 @@ export default function ChatScreen({cwd: initialCwd, model: initialModel, mode: 
     return <View>{content}</View>;
   }, [renderAssistantMessage, state.runs]);
 
+  const restoreAnchorIfAtBottom = useCallback(() => {
+    if (!isNearBottom.current) return;
+    anchorDisabledByUser.current = false;
+    const latestUser = [...rows].reverse().find(item => item.kind === 'user');
+    if (latestUser) setAnchorId(latestUser.id);
+  }, [rows]);
   const scheduleScrollIdle = useCallback(() => {
     if (scrollIdleTimer.current !== null) clearTimeout(scrollIdleTimer.current);
     scrollIdleTimer.current = setTimeout(() => {
-      if (!listDragging.current) setListScrolling(false);
+      if (listDragging.current) return;
+      setListScrolling(false);
+      restoreAnchorIfAtBottom();
     }, 160);
-  }, []);
+  }, [restoreAnchorIfAtBottom]);
   const onListScrollBegin = useCallback(() => {
     if (scrollIdleTimer.current !== null) clearTimeout(scrollIdleTimer.current);
     setListScrolling(true);
@@ -470,7 +526,8 @@ export default function ChatScreen({cwd: initialCwd, model: initialModel, mode: 
   const onListScrollEnd = useCallback(() => {
     if (scrollIdleTimer.current !== null) clearTimeout(scrollIdleTimer.current);
     setListScrolling(false);
-  }, []);
+    restoreAnchorIfAtBottom();
+  }, [restoreAnchorIfAtBottom]);
   const onListScroll = useCallback((event: any) => {
     const {contentOffset, contentSize, layoutMeasurement} = event.nativeEvent;
     topBarScrollY.setValue(contentOffset.y);
@@ -493,7 +550,14 @@ export default function ChatScreen({cwd: initialCwd, model: initialModel, mode: 
     renderNavigationView={() => <SessionDrawer
       state={state}
       onSelect={id => { drawerRef.current?.closeDrawer(); FccChat.selectSession(id); }}
-      onMenu={(id, tag) => { FccChat.showSessionMenu(id, tag).catch(console.warn); }}
+      onDelete={session => Alert.alert(
+        'Excluir conversa?',
+        `A conversa “${session.title || 'Nova conversa'}” será excluída. Esta ação não pode ser desfeita.`,
+        [
+          {text: 'Cancelar', style: 'cancel'},
+          {text: 'Excluir', style: 'destructive', onPress: () => { FccChat.deleteSession(session.id).catch(console.warn); }},
+        ],
+      )}
       onNew={() => { drawerRef.current?.closeDrawer(); FccChat.newSession(localCwd, '', localMode, ''); }}
       onSettings={onSettings}
     />}
@@ -595,7 +659,7 @@ export default function ChatScreen({cwd: initialCwd, model: initialModel, mode: 
           }}
         />
         {state.busy && !state.draft.trim()
-          ? <IconButton icon="square" label="Parar resposta" onPress={() => FccChat.stop()} />
+          ? <IconButton icon="square" label="Parar resposta" filled rippleRadius={19} onPress={() => FccChat.stop()} />
           : <IconButton icon="arrow_up" label="Enviar mensagem" filled disabled={!state.draft.trim()} onPress={() => { void send(); }} />}
         </View>
       </View>
@@ -620,9 +684,9 @@ export default function ChatScreen({cwd: initialCwd, model: initialModel, mode: 
   </DrawerLayoutAndroid>;
 }
 
-function SessionDrawer({state, onSelect, onMenu, onNew, onSettings}: {
+function SessionDrawer({state, onSelect, onDelete, onNew, onSettings}: {
   state: ChatState; onSelect: (id: string) => void;
-  onMenu: (id: string, tag: number) => void; onNew: () => void; onSettings: () => void;
+  onDelete: (session: Session) => void; onNew: () => void; onSettings: () => void;
 }) {
   const {styles} = useStyles(stylesheet);
   return <SafeAreaView style={styles.drawer}>
@@ -637,7 +701,11 @@ function SessionDrawer({state, onSelect, onMenu, onNew, onSettings}: {
     <ScrollView style={styles.sessionList} showsVerticalScrollIndicator={false}>
       {state.sessions.filter(session => session.harness === 'claude').map(session => <View key={session.id} style={[styles.sessionRow, state.session?.id === session.id && styles.sessionActive]}>
         <Pressable accessibilityRole="button" android_ripple={{color: '#FFFFFF18'}} style={styles.sessionSelect} onPress={() => onSelect(session.id)}><Text numberOfLines={1} style={styles.sessionTitle}>{session.title || 'Nova conversa'}</Text></Pressable>
-        <Pressable accessibilityRole="button" accessibilityLabel={`Opções da conversa ${session.title || 'Nova conversa'}`} style={styles.action} onPress={event => onMenu(session.id, Number(event.nativeEvent.target))}><Text style={[styles.actionText, {color: C.muted}]}>⋯</Text></Pressable>
+        <ContextMenu
+          accessibilityLabel={`Opções da conversa ${session.title || 'Nova conversa'}`}
+          actions={[{label: 'Excluir conversa', destructive: true, onPress: () => onDelete(session)}]}
+          renderTrigger={({onPress, expanded}) => <Pressable accessibilityRole="button" accessibilityLabel={`Opções da conversa ${session.title || 'Nova conversa'}`} accessibilityState={{expanded}} style={styles.action} onPress={onPress} android_ripple={{color: '#FFFFFF20', foreground: true}}><ContextMenuDots /></Pressable>}
+        />
       </View>)}
     </ScrollView>
     <View style={styles.drawerFooter}>

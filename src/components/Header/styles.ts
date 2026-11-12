@@ -13,12 +13,4 @@ export const stylesheet = createStyleSheet(theme => ({
   headerActions: {flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.raised, borderWidth: 1, borderColor: theme.colors.line, borderRadius: 26, overflow: 'hidden'},
   headerAction: {width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center'},
   headerActionIcon: {width: 22, height: 22, tintColor: theme.colors.text},
-  moreDots: {width: 24, height: 24, alignItems: 'center', justifyContent: 'center', gap: 3},
-  moreDot: {width: 3.5, height: 3.5, borderRadius: 2, backgroundColor: theme.colors.text},
-  headerMenuOverlay: {...StyleSheet.absoluteFillObject, zIndex: 100, elevation: 20},
-  headerMenuPanel: {position: 'absolute', transformOrigin: 'top right', padding: theme.spacing.sm, backgroundColor: '#212124', borderRadius: 22, borderWidth: 1, borderColor: '#FFFFFF24', elevation: 12},
-  headerMenuItem: {minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md, paddingHorizontal: theme.spacing.md, borderRadius: 14},
-  headerMenuIcon: {width: 19, height: 19, tintColor: theme.colors.muted},
-  headerMenuGlyph: {width: 19, color: theme.colors.muted, fontSize: 18, textAlign: 'center'},
-  headerMenuLabel: {color: theme.colors.text, fontSize: theme.typography.base, fontWeight: '500'},
 }));

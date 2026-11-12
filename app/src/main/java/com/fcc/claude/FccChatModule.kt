@@ -4,14 +4,6 @@ import android.app.Activity
 import android.content.Intent
 import android.database.Cursor
 import android.provider.OpenableColumns
-import android.graphics.Color
-import android.text.SpannableString
-import android.text.Spanned
-import android.text.style.ForegroundColorSpan
-import androidx.appcompat.app.AlertDialog
-import androidx.appcompat.widget.PopupMenu
-import androidx.appcompat.content.res.AppCompatResources
-import com.facebook.react.uimanager.UIManagerHelper
 import androidx.lifecycle.ViewModelProvider
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ActivityEventListener
@@ -168,9 +160,9 @@ class FccChatModule(private val context: ReactApplicationContext) :
     }
 
     @ReactMethod
-    fun sendMessage(text: String, promise: Promise) = runWithModel(promise) { vm ->
+    fun sendMessage(text: String, clientMessageId: String, promise: Promise) = runWithModel(promise) { vm ->
         val cwd = vm.session.value?.cwd ?: (context.currentActivity as? MainActivity)?.launchCwd ?: ChatRepository.defaultWorkingDirectory()
-        vm.sendMessage(text, null, cwd, vm.session.value?.reasoningEffort.orEmpty(), context.contentResolver)
+        vm.sendMessage(text, null, cwd, vm.session.value?.reasoningEffort.orEmpty(), context.contentResolver, clientMessageId)
     }
 
     @ReactMethod
@@ -190,44 +182,6 @@ class FccChatModule(private val context: ReactApplicationContext) :
     fun deleteSession(id: String, promise: Promise) = runWithModel(promise) { vm ->
         vm.sessions.firstOrNull { it.id == id }?.let { vm.deleteSession(it) }
         null
-    }
-
-    @ReactMethod
-    fun showSessionMenu(id: String, viewTag: Double, promise: Promise) {
-        scope.launch {
-            try {
-                val activity = context.currentActivity ?: error("A tela principal não está disponível.")
-                val tag = viewTag.toInt()
-                val anchor = UIManagerHelper.getUIManagerForReactTag(context, tag)?.resolveView(tag)
-                    ?: error("O botão da conversa não está disponível.")
-                val vm = currentModel()
-                val session = vm.sessions.firstOrNull { it.id == id } ?: run { promise.resolve(null); return@launch }
-                val red = Color.rgb(207, 153, 153)
-                val label = SpannableString("Excluir conversa").apply {
-                    setSpan(ForegroundColorSpan(red), 0, length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-                }
-                PopupMenu(activity, anchor).apply {
-                    menu.add(label).icon = AppCompatResources.getDrawable(activity, R.drawable.ic_delete)?.mutate()?.apply { setTint(red) }
-                    setForceShowIcon(true)
-                    setOnMenuItemClickListener {
-                        AlertDialog.Builder(activity)
-                            .setTitle("Excluir conversa?")
-                            .setMessage("A conversa “${session.title.ifBlank { "Nova conversa" }}” será excluída. Esta ação não pode ser desfeita.")
-                            .setNegativeButton("Cancelar", null)
-                            .setPositiveButton("Excluir") { _, _ -> scope.launch { vm.deleteSession(session) } }
-                            .create().apply {
-                                setOnShowListener { getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(red) }
-                                show()
-                            }
-                        true
-                    }
-                    show()
-                }
-                promise.resolve(null)
-            } catch (failure: Exception) {
-                promise.reject("FCC_SESSION_MENU", failure)
-            }
-        }
     }
 
     @ReactMethod

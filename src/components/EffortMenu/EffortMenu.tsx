@@ -195,7 +195,6 @@ export function EffortMenu({
                       <Image source={require('../../assets/lucide/zap.png')} style={s.resetIcon} />
                     </Pressable>
                     <Text style={s.previewTitle}>
-                      <Text style={s.previewPrefix}>Esforço </Text>
                       <Text style={s.previewValue}>{labels[previewEffort] || previewEffort}</Text>
                     </Text>
                     <Pressable
@@ -304,19 +303,26 @@ const EffortSlider = React.memo(function EffortSlider({values, selected, onSelec
   const sliderRef = useRef<View>(null);
   const width = useRef(0);
   const pageXOffset = useRef(0);
+  const didMove = useRef(false);
   const currentProgress = useRef(initialIndex / Math.max(1, values.length - 1));
   const progress = useSharedValue(currentProgress.current);
   const latest = useRef({values, onSelect, onPreview});
   latest.current = {values, onSelect, onPreview};
-  const inset = 24;
+  const trackInset = 16;
+  const endpointInset = 32;
+  const travel = Math.max(0, layoutWidth - endpointInset * 2);
 
-  const fillStyle = useAnimatedStyle(() => ({width: inset + Math.max(0, layoutWidth - inset * 2) * progress.value}));
-  const thumbStyle = useAnimatedStyle(() => ({left: inset + Math.max(0, layoutWidth - inset * 2) * progress.value - 14}));
+  const fillStyle = useAnimatedStyle(() => ({width: trackInset + travel * progress.value}));
+  const thumbStyle = useAnimatedStyle(() => ({left: endpointInset + travel * progress.value - 14}));
+
+  const progressFromPageX = (pageX: number) => {
+    const x = pageX - pageXOffset.current;
+    const trackWidth = Math.max(1, width.current - endpointInset * 2);
+    return Math.max(0, Math.min(1, (x - endpointInset) / trackWidth));
+  };
 
   const updateFromPageX = (pageX: number) => {
-    const x = pageX - pageXOffset.current;
-    const trackWidth = Math.max(1, width.current - inset * 2);
-    const nextProgress = Math.max(0, Math.min(1, (x - inset) / trackWidth));
+    const nextProgress = progressFromPageX(pageX);
     currentProgress.current = nextProgress;
     progress.value = nextProgress;
     const nextIndex = Math.round(nextProgress * Math.max(0, latest.current.values.length - 1));
@@ -331,21 +337,20 @@ const EffortSlider = React.memo(function EffortSlider({values, selected, onSelec
   const responder = useRef(PanResponder.create({
     onStartShouldSetPanResponder: () => true,
     onMoveShouldSetPanResponder: () => true,
-    onPanResponderGrant: event => {
-      sliderRef.current?.measureInWindow(x => {
-        pageXOffset.current = x;
-        updateFromPageX(event.nativeEvent.pageX);
-      });
+    onPanResponderGrant: () => { didMove.current = false; },
+    onPanResponderMove: event => {
+      didMove.current = true;
+      updateFromPageX(event.nativeEvent.pageX);
     },
-    onPanResponderMove: event => updateFromPageX(event.nativeEvent.pageX),
-    onPanResponderRelease: () => {
+    onPanResponderRelease: event => {
       const count = latest.current.values.length;
-      const nearestIndex = Math.round(currentProgress.current * Math.max(0, count - 1));
+      const releaseProgress = didMove.current ? currentProgress.current : progressFromPageX(event.nativeEvent.pageX);
+      const nearestIndex = Math.round(releaseProgress * Math.max(0, count - 1));
       const snappedProgress = nearestIndex / Math.max(1, count - 1);
       currentProgress.current = snappedProgress;
       previewIndex.current = nearestIndex;
       latest.current.onPreview(latest.current.values[nearestIndex]);
-      progress.value = withSpring(snappedProgress, {stiffness: 220, damping: 22}, finished => {
+      progress.value = withSpring(snappedProgress, {stiffness: 120, damping: 24, overshootClamping: true}, finished => {
         if (finished) runOnJS(selectIndex)(nearestIndex);
       });
     },
@@ -378,7 +383,7 @@ const EffortSlider = React.memo(function EffortSlider({values, selected, onSelec
       >
         <View pointerEvents="none" style={s.track} />
         <Reanimated.View pointerEvents="none" style={[s.fill, fillStyle]} />
-        <View pointerEvents="none" style={[s.steps, {left: inset, right: inset}]}>
+        <View pointerEvents="none" style={[s.steps, {left: endpointInset, right: endpointInset}]}>
           {values.map(value => <View key={value} style={s.dot} />)}
         </View>
         <Reanimated.View pointerEvents="none" style={[s.thumb, thumbStyle]} />

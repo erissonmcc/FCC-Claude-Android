@@ -291,7 +291,7 @@ internal class ChatViewModel(application: Application) : AndroidViewModel(applic
         }
     }
 
-    suspend fun sendMessage(text: String, queued: PendingMessage?, cwd: String, selectedEffort: String, contentResolver: android.content.ContentResolver): Boolean {
+    suspend fun sendMessage(text: String, queued: PendingMessage?, cwd: String, selectedEffort: String, contentResolver: android.content.ContentResolver, clientMessageId: String? = null): Boolean {
         val value = text.trim()
         if (value.isEmpty()) return false
         if (session.value != null && detailLoadedForSession.value != session.value?.id) {
@@ -335,7 +335,7 @@ internal class ChatViewModel(application: Application) : AndroidViewModel(applic
         val originalGeneration = detailGeneration.intValue
         val creatingMarker = "__fcc_creating_session__"
         var active: ChatSession? = originalSession
-        val optimisticId = java.util.UUID.randomUUID().toString()
+        val optimisticId = clientMessageId?.takeIf { it.isNotBlank() } ?: java.util.UUID.randomUUID().toString()
         val clearedDraft = queued == null && draft.value == text
         turnGeneration += 1
         sendingSessionId.value = originalSession?.id ?: creatingMarker
