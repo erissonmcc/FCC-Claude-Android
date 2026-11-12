@@ -575,7 +575,7 @@ export default function ChatScreen({cwd: initialCwd, model: initialModel, mode: 
           />
         </View>
         <View style={styles.composerControls}>
-        <IconButton icon="plus" label="Anexar arquivos" onPress={() => FccChat.pickAttachments()} />
+        <IconButton icon="plus" label="Anexar arquivos" onPress={() => FccChat.pickAttachments()} buttonStyle={styles.composerRoundButton} rippleRadius={20} />
         <ApprovalMenu
           mode={localMode}
           onSelectMode={value => {

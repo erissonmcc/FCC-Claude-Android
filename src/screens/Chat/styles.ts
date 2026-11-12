@@ -3,7 +3,7 @@ import {createStyleSheet} from 'react-native-unistyles';
 
 export const stylesheet = createStyleSheet(theme => ({
   screen: {flex: 1, backgroundColor: theme.colors.backdrop},
-  action: {minHeight: 42, minWidth: 40, paddingHorizontal: 11, alignItems: 'center', justifyContent: 'center', borderRadius: 16}, actionText: {fontSize: theme.typography.md, fontWeight: '600'}, pressed: {backgroundColor: theme.colors.raised}, disabled: {opacity: 0.45},
+  action: {minHeight: 42, minWidth: 40, paddingHorizontal: 11, alignItems: 'center', justifyContent: 'center', borderRadius: 16}, composerRoundButton: {width: 40, height: 40, minWidth: 40, minHeight: 40, paddingHorizontal: 0, borderRadius: 20}, actionText: {fontSize: theme.typography.md, fontWeight: '600'}, pressed: {backgroundColor: theme.colors.raised}, disabled: {opacity: 0.45},
   messages: {flex: 1, backgroundColor: theme.colors.backdrop}, messagesContent: {flexGrow: 1, paddingTop: theme.spacing.md, paddingBottom: theme.spacing.lg},
   transcript: {flex: 1}, latestButton: {width: 38, height: 38, borderRadius: 19, backgroundColor: theme.colors.raised, borderWidth: 1, borderColor: theme.colors.line, alignItems: 'center', justifyContent: 'center'}, latestText: {color: theme.colors.text, fontSize: 22},
   transcriptBottomFade: {position: 'absolute', left: 0, right: 0, bottom: 0},

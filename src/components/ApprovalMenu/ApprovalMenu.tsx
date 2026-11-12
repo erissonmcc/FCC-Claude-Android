@@ -75,7 +75,7 @@ export function ApprovalMenu({mode, onSelectMode}: {mode: string; onSelectMode: 
 
   return <>
     <View ref={triggerRef} collapsable={false} style={s.anchor} onLayout={() => {if (visible) positionMenu();}}>
-      <Pressable accessibilityRole="button" accessibilityLabel="Como as ações devem ser aprovadas?" accessibilityState={{expanded: visible}} onPress={open} style={s.trigger}>
+      <Pressable accessibilityRole="button" accessibilityLabel="Como as ações devem ser aprovadas?" accessibilityState={{expanded: visible}} onPress={open} android_ripple={{color: '#FFFFFF20', foreground: true, radius: 20}} style={s.trigger}>
         <Image source={require('../../assets/lucide/hand.png')} style={s.icon} />
       </Pressable>
     </View>
