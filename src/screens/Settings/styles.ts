@@ -4,7 +4,7 @@ export const stylesheet = createStyleSheet(theme => ({
   screen: {flex: 1, backgroundColor: theme.colors.backdrop},
   header: {flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 12, gap: 18},
   back: {width: 44, height: 44, borderRadius: 22, backgroundColor: theme.colors.raised, alignItems: 'center', justifyContent: 'center'},
-  backText: {color: theme.colors.text, fontSize: 34, lineHeight: 40},
+  backIcon: {width: 24, height: 24, tintColor: theme.colors.text, transform: [{rotate: '180deg'}]},
   content: {paddingHorizontal: 20, paddingBottom: 36, gap: theme.spacing.sm},
   title: {color: theme.colors.text, fontSize: 23, fontWeight: '700'},
   section: {color: theme.colors.muted, fontSize: 15, fontWeight: '600', marginTop: 20, marginLeft: 6},

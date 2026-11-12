@@ -47,6 +47,25 @@ class FccChatModule(private val context: ReactApplicationContext) :
     override fun getName() = "FccChat"
 
     @ReactMethod
+    fun openSettings(cwd: String, modelName: String, mode: String, effort: String, backendUrl: String, backendToken: String, promise: Promise) {
+        val activity = context.currentActivity ?: run { promise.reject("FCC_SETTINGS", "A tela principal do FCC não está disponível."); return }
+        activity.startActivity(Intent(activity, SettingsActivity::class.java).apply {
+            putExtra("fcc_cwd", cwd)
+            putExtra("fcc_model", modelName)
+            putExtra("fcc_mode", mode)
+            putExtra("fcc_effort", effort)
+            putExtra("fcc_backend_url", backendUrl)
+            putExtra("fcc_backend_token", backendToken)
+        })
+        promise.resolve(null)
+    }
+
+    @ReactMethod
+    fun finishSettings() {
+        context.currentActivity?.takeIf { it is SettingsActivity }?.finish()
+    }
+
+    @ReactMethod
     fun addListener(eventName: String) = Unit
 
     @ReactMethod

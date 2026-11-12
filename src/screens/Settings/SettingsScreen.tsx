@@ -1,5 +1,5 @@
 import React from 'react';
-import {ScrollView, Text, TextInput, View} from 'react-native';
+import {Image, ScrollView, Text, TextInput, View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useStyles} from 'react-native-unistyles';
 import {colors} from '../../theme';
@@ -29,7 +29,7 @@ export function SettingsScreen({cwd, model, mode, effort, backendUrl, backendTok
   const {styles} = useStyles(stylesheet);
   return <SafeAreaView style={styles.screen}>
       <View style={styles.header}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Voltar" onPress={onClose} style={styles.back}><Text style={styles.backText}>‹</Text></Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel="Voltar" onPress={onClose} style={styles.back}><Image source={require('../../assets/lucide/chevron_right.png')} style={styles.backIcon} /></Pressable>
         <Text style={styles.title}>Configurações</Text>
       </View>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">

@@ -4,10 +4,13 @@ import {SafeAreaProvider, initialWindowMetrics} from 'react-native-safe-area-con
 import {PortalProvider} from '@gorhom/portal';
 import {KeyboardProvider} from 'react-native-keyboard-controller';
 import ChatScreen from './screens/Chat/ChatScreen';
-import {SettingsScreen} from './screens/Settings/SettingsScreen';
+import {NativeModules} from 'react-native';
+
+const FccChat = NativeModules.FccChat as {
+  openSettings(cwd: string, model: string, mode: string, effort: string, backendUrl: string, backendToken: string): Promise<void>;
+};
 
 export default function App() {
-  const [showSettings, setShowSettings] = useState(false);
   const [cwd, setCwd] = useState('/storage/emulated/0');
   const [model, setModel] = useState('');
   const [mode, setMode] = useState('config');
@@ -27,43 +30,19 @@ export default function App() {
     setBackendToken(next.backendToken);
   }, []);
 
-  const onSaveSettings = useCallback(async () => {
-    setShowSettings(false);
-  }, []);
-
   return <SafeAreaProvider initialMetrics={initialWindowMetrics} style={{flex: 1, backgroundColor: '#000000'}}>
     <KeyboardProvider>
       <PortalProvider>
-        {showSettings ? (
-          <SettingsScreen
-            cwd={cwd}
-            model={model}
-            mode={mode}
-            effort={effort}
-            backendUrl={backendUrl}
-            backendToken={backendToken}
-            onClose={() => setShowSettings(false)}
-            onChooseFolder={async () => { }}
-            onChangeCwd={setCwd}
-            onChangeModel={setModel}
-            onChangeMode={setMode}
-            onChangeEffort={setEffort}
-            onChangeBackendUrl={setBackendUrl}
-            onChangeBackendToken={setBackendToken}
-            onSave={onSaveSettings}
-          />
-        ) : (
-          <ChatScreen
-            cwd={cwd}
-            model={model}
-            mode={mode}
-            effort={effort}
-            backendUrl={backendUrl}
-            backendToken={backendToken}
-            onSettings={() => setShowSettings(true)}
-            onConfigChange={onConfigChange}
-          />
-        )}
+        <ChatScreen
+          cwd={cwd}
+          model={model}
+          mode={mode}
+          effort={effort}
+          backendUrl={backendUrl}
+          backendToken={backendToken}
+          onSettings={() => { void FccChat.openSettings(cwd, model, mode, effort, backendUrl, backendToken); }}
+          onConfigChange={onConfigChange}
+        />
       </PortalProvider>
     </KeyboardProvider>
   </SafeAreaProvider>;

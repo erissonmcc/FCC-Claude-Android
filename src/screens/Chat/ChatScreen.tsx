@@ -24,6 +24,7 @@ import Markdown from 'react-native-markdown-display';
 import type {RenderRules} from 'react-native-markdown-display';
 import { useStyles} from 'react-native-unistyles';
 import { EffortMenu} from '../../components/EffortMenu/EffortMenu';
+import { ApprovalMenu} from '../../components/ApprovalMenu/ApprovalMenu';
 import { GeneratingIndicator} from '../../components/GeneratingIndicator/GeneratingIndicator';
 import { Pressable} from '../../components/Pressable/Pressable';
 import { WorkActivity, type Run} from '../../components/ToolActivity/ToolActivity';
@@ -493,7 +494,7 @@ export default function ChatScreen({cwd: initialCwd, model: initialModel, mode: 
       state={state}
       onSelect={id => { drawerRef.current?.closeDrawer(); FccChat.selectSession(id); }}
       onMenu={(id, tag) => { FccChat.showSessionMenu(id, tag).catch(console.warn); }}
-      onNew={() => { drawerRef.current?.closeDrawer(); FccChat.newSession(localCwd, '', 'config', ''); }}
+      onNew={() => { drawerRef.current?.closeDrawer(); FccChat.newSession(localCwd, '', localMode, ''); }}
       onSettings={onSettings}
     />}
   >
@@ -574,6 +575,14 @@ export default function ChatScreen({cwd: initialCwd, model: initialModel, mode: 
         </View>
         <View style={styles.composerControls}>
         <IconButton icon="plus" label="Anexar arquivos" onPress={() => FccChat.pickAttachments()} />
+        <ApprovalMenu
+          mode={localMode}
+          onSelectMode={value => {
+            setLocalMode(value);
+            syncConfig({cwd: localCwd, model: localModel, mode: value, effort: localEffort, backendUrl: localBackendUrl, backendToken: localBackendToken});
+            void FccChat.applySettings(localCwd, localModel, value, localEffort);
+          }}
+        />
         <EffortMenu
           modelId={localModel || state.bootstrap?.default_model || ""}
           models={state.bootstrap?.models || []}
@@ -600,7 +609,7 @@ export default function ChatScreen({cwd: initialCwd, model: initialModel, mode: 
       busy={state.busy}
       scrollY={topBarScrollY}
       onOpenDrawer={() => drawerRef.current?.openDrawer()}
-      onNewConversation={() => FccChat.newSession(localCwd, '', 'config', '')}
+      onNewConversation={() => FccChat.newSession(localCwd, '', localMode, '')}
       onRefresh={() => { void FccChat.refresh(); }}
       onStop={() => FccChat.stop()}
       onSettings={onSettings}

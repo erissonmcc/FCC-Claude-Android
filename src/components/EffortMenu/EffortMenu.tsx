@@ -90,10 +90,10 @@ export function EffortMenu({
   const positionMenu = (onPositioned?: () => void) => {
     overlayRef.current?.measureInWindow((overlayX, overlayY, overlayWidth, overlayHeight) => {
       triggerRef.current?.measureInWindow((x, y, width) => {
-        const panelWidth = Math.min(290, overlayWidth - 24);
+        const panelWidth = Math.min(420, overlayWidth - 32);
         setPosition({
           width: panelWidth,
-          left: Math.max(12, Math.min(x + width - overlayX - panelWidth, overlayWidth - panelWidth - 12)),
+          left: Math.max(16, Math.min(x + width - overlayX - panelWidth, overlayWidth - panelWidth - 16)),
           bottom: overlayHeight - (y - overlayY) + 8,
         });
         onPositioned?.();

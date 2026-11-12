@@ -24,7 +24,7 @@ export const stylesheet = createStyleSheet(theme => ({
     borderWidth: 1,
     borderColor: '#FFFFFF24',
   },
-  panelContent: {flex: 1, justifyContent: 'flex-end', paddingHorizontal: theme.spacing.md, paddingVertical: theme.spacing.sm},
+  panelContent: {flex: 1, justifyContent: 'flex-end', paddingHorizontal: theme.spacing.lg, paddingTop: theme.spacing.md, paddingBottom: theme.spacing.sm},
   heading: {flexDirection: 'row', alignItems: 'center'},
   previewTitle: {flex: 1, textAlign: 'center', color: '#60A5FA', fontSize: theme.typography.lg, fontWeight: '500'},
   resetIcon: {width: 18, height: 18, tintColor: theme.colors.muted},
