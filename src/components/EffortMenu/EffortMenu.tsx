@@ -90,7 +90,7 @@ export function EffortMenu({
   const positionMenu = (onPositioned?: () => void) => {
     overlayRef.current?.measureInWindow((overlayX, overlayY, overlayWidth, overlayHeight) => {
       triggerRef.current?.measureInWindow((x, y, width) => {
-        const panelWidth = Math.min(420, overlayWidth - 32);
+        const panelWidth = Math.min(360, overlayWidth - 32);
         setPosition({
           width: panelWidth,
           left: Math.max(16, Math.min(x + width - overlayX - panelWidth, overlayWidth - panelWidth - 16)),
@@ -284,12 +284,14 @@ export function EffortMenu({
 
 function EffortSlider({values, selected, onSelect}: {values: string[]; selected: string; onSelect: (value: string) => void}) {
   const {styles: s} = useStyles(stylesheet);
-  const [preview, setPreview] = useState(Math.max(0, values.indexOf(selected)));
+  const initialIndex = Math.max(0, values.indexOf(selected));
+  const [preview, setPreview] = useState(initialIndex);
   const [layoutWidth, setLayoutWidth] = useState(0);
   const sliderRef = useRef<View>(null);
   const width = useRef(0);
   const pageXOffset = useRef(0);
-  const current = useRef(preview);
+  const currentProgress = useRef(initialIndex / Math.max(1, values.length - 1));
+  const progress = useRef(new Animated.Value(currentProgress.current)).current;
   const latest = useRef({values, onSelect});
   latest.current = {values, onSelect};
   const inset = 24;
@@ -298,27 +300,44 @@ function EffortSlider({values, selected, onSelect}: {values: string[]; selected:
     const x = pageX - pageXOffset.current;
     const count = latest.current.values.length;
     const trackWidth = Math.max(1, width.current - inset * 2);
-    const index = Math.max(0, Math.min(count - 1, Math.round((x - inset) / trackWidth * (count - 1))));
-    current.current = index;
-    setPreview(index);
+    const nextProgress = Math.max(0, Math.min(1, (x - inset) / trackWidth));
+    currentProgress.current = nextProgress;
+    progress.setValue(nextProgress);
+    setPreview(Math.round(nextProgress * Math.max(0, count - 1)));
   };
 
   const responder = useRef(PanResponder.create({
     onStartShouldSetPanResponder: () => true,
     onMoveShouldSetPanResponder: () => true,
     onPanResponderGrant: event => {
+      progress.stopAnimation();
       sliderRef.current?.measureInWindow(x => {
         pageXOffset.current = x;
         updateFromPageX(event.nativeEvent.pageX);
       });
     },
     onPanResponderMove: event => updateFromPageX(event.nativeEvent.pageX),
-    onPanResponderRelease: () => latest.current.onSelect(latest.current.values[current.current]),
+    onPanResponderRelease: () => {
+      const count = latest.current.values.length;
+      const nearestIndex = Math.round(currentProgress.current * Math.max(0, count - 1));
+      const snappedProgress = nearestIndex / Math.max(1, count - 1);
+      currentProgress.current = snappedProgress;
+      Animated.spring(progress, {
+        toValue: snappedProgress,
+        stiffness: 220,
+        damping: 22,
+        mass: 0.7,
+        useNativeDriver: false,
+      }).start(({finished}) => {
+        if (finished) latest.current.onSelect(latest.current.values[nearestIndex]);
+      });
+    },
     onPanResponderTerminationRequest: () => false,
   })).current;
 
   const range = Math.max(0, layoutWidth - inset * 2);
-  const progress = values.length > 1 ? preview / (values.length - 1) : 0;
+  const fillWidth = progress.interpolate({inputRange: [0, 1], outputRange: [inset, inset + range]});
+  const thumbLeft = progress.interpolate({inputRange: [0, 1], outputRange: [inset - 16, inset + range - 16]});
 
   return (
     <View>
@@ -343,11 +362,11 @@ function EffortSlider({values, selected, onSelect}: {values: string[]; selected:
         style={s.slider}
       >
         <View pointerEvents="none" style={s.track} />
-        <View pointerEvents="none" style={[s.fill, {width: range * progress + inset}]} />
+        <Animated.View pointerEvents="none" style={[s.fill, {width: fillWidth}]} />
         <View pointerEvents="none" style={[s.steps, {left: inset, right: inset}]}>
-          {values.map((value, index) => <View key={value} style={[s.dot, index === preview && {opacity: 0}]} />)}
+          {values.map(value => <View key={value} style={s.dot} />)}
         </View>
-        <View pointerEvents="none" style={[s.thumb, {left: inset + range * progress - 16}]} />
+        <Animated.View pointerEvents="none" style={[s.thumb, {left: thumbLeft}]} />
       </View>
     </View>
   );
