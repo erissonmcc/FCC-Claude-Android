@@ -24,7 +24,6 @@ class SettingsActivity : ReactActivity() {
         }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, false)
         window.statusBarColor = Color.TRANSPARENT
         window.navigationBarColor = Color.BLACK
@@ -32,5 +31,6 @@ class SettingsActivity : ReactActivity() {
         val insetsController = WindowCompat.getInsetsController(window, window.decorView)
         insetsController.isAppearanceLightNavigationBars = false
         insetsController.isAppearanceLightStatusBars = false
+        super.onCreate(savedInstanceState)
     }
 }
