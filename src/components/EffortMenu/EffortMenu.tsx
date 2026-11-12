@@ -1,4 +1,4 @@
-import React, {useEffect, useRef, useState} from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {Animated, AppState, BackHandler, Image, Keyboard, PanResponder, ScrollView, StyleSheet, Text, View} from 'react-native';
 import {Portal} from '@gorhom/portal';
 import Reanimated, {runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming} from 'react-native-reanimated';
@@ -49,10 +49,18 @@ export function EffortMenu({
   const model = models.find(entry => entry.id === modelId);
   const values = model?.reasoning_efforts ?? [];
   const selectedEffort = values.includes(effort) ? effort : model?.default_reasoning_effort || values[0] || '';
+  const [previewEffort, setPreviewEffort] = useState(selectedEffort);
   const name = displayName(model, modelId);
   const compactHeight = values.length > 0 ? 130 : 86;
   const panelHeight = useSharedValue(compactHeight);
   const animatedPanelStyle = useAnimatedStyle(() => ({height: panelHeight.value}));
+
+  useEffect(() => setPreviewEffort(selectedEffort), [selectedEffort]);
+
+  const selectEffort = useCallback((value: string) => {
+    setPreviewEffort(value);
+    onSelectEffort(value);
+  }, [onSelectEffort]);
 
   const showModels = () => {
     setView('models');
@@ -186,7 +194,10 @@ export function EffortMenu({
                     <Pressable style={s.resetButton} accessibilityRole="button" accessibilityLabel="Raio" onPress={() => {}}>
                       <Image source={require('../../assets/lucide/zap.png')} style={s.resetIcon} />
                     </Pressable>
-                    <Text style={s.previewTitle}>{labels[selectedEffort] || selectedEffort}</Text>
+                    <Text style={s.previewTitle}>
+                      <Text style={s.previewPrefix}>Esforço </Text>
+                      <Text style={s.previewValue}>{labels[previewEffort] || previewEffort}</Text>
+                    </Text>
                     <Pressable
                       style={s.resetButton}
                       accessibilityRole="button"
@@ -209,7 +220,8 @@ export function EffortMenu({
                       key={`${modelId}-${selectedEffort}`}
                       values={values}
                       selected={selectedEffort}
-                      onSelect={onSelectEffort}
+                      onSelect={selectEffort}
+                      onPreview={setPreviewEffort}
                     />
                   )}
                 </>
@@ -279,18 +291,23 @@ export function EffortMenu({
   );
 }
 
-function EffortSlider({values, selected, onSelect}: {values: string[]; selected: string; onSelect: (value: string) => void}) {
+const EffortSlider = React.memo(function EffortSlider({values, selected, onSelect, onPreview}: {
+  values: string[];
+  selected: string;
+  onSelect: (value: string) => void;
+  onPreview: (value: string) => void;
+}) {
   const {styles: s} = useStyles(stylesheet);
   const initialIndex = Math.max(0, values.indexOf(selected));
-  const [preview, setPreview] = useState(initialIndex);
+  const previewIndex = useRef(initialIndex);
   const [layoutWidth, setLayoutWidth] = useState(0);
   const sliderRef = useRef<View>(null);
   const width = useRef(0);
   const pageXOffset = useRef(0);
   const currentProgress = useRef(initialIndex / Math.max(1, values.length - 1));
   const progress = useSharedValue(currentProgress.current);
-  const latest = useRef({values, onSelect});
-  latest.current = {values, onSelect};
+  const latest = useRef({values, onSelect, onPreview});
+  latest.current = {values, onSelect, onPreview};
   const inset = 24;
 
   const fillStyle = useAnimatedStyle(() => ({width: inset + Math.max(0, layoutWidth - inset * 2) * progress.value}));
@@ -302,6 +319,11 @@ function EffortSlider({values, selected, onSelect}: {values: string[]; selected:
     const nextProgress = Math.max(0, Math.min(1, (x - inset) / trackWidth));
     currentProgress.current = nextProgress;
     progress.value = nextProgress;
+    const nextIndex = Math.round(nextProgress * Math.max(0, latest.current.values.length - 1));
+    if (nextIndex !== previewIndex.current) {
+      previewIndex.current = nextIndex;
+      latest.current.onPreview(latest.current.values[nextIndex]);
+    }
   };
 
   const selectIndex = (index: number) => latest.current.onSelect(latest.current.values[index]);
@@ -321,7 +343,8 @@ function EffortSlider({values, selected, onSelect}: {values: string[]; selected:
       const nearestIndex = Math.round(currentProgress.current * Math.max(0, count - 1));
       const snappedProgress = nearestIndex / Math.max(1, count - 1);
       currentProgress.current = snappedProgress;
-      setPreview(nearestIndex);
+      previewIndex.current = nearestIndex;
+      latest.current.onPreview(latest.current.values[nearestIndex]);
       progress.value = withSpring(snappedProgress, {stiffness: 220, damping: 22}, finished => {
         if (finished) runOnJS(selectIndex)(nearestIndex);
       });
@@ -337,10 +360,12 @@ function EffortSlider({values, selected, onSelect}: {values: string[]; selected:
         accessible
         accessibilityRole="adjustable"
         accessibilityLabel="Esforço de raciocínio"
-        accessibilityValue={{min: 0, max: values.length - 1, now: preview, text: labels[values[preview]] || values[preview]}}
+        accessibilityValue={{min: 0, max: values.length - 1, now: previewIndex.current, text: labels[values[previewIndex.current]] || values[previewIndex.current]}}
         accessibilityActions={[{name: 'increment'}, {name: 'decrement'}]}
         onAccessibilityAction={event => {
-          const next = Math.max(0, Math.min(values.length - 1, preview + (event.nativeEvent.actionName === 'increment' ? 1 : -1)));
+          const next = Math.max(0, Math.min(values.length - 1, previewIndex.current + (event.nativeEvent.actionName === 'increment' ? 1 : -1)));
+          previewIndex.current = next;
+          onPreview(values[next]);
           onSelect(values[next]);
         }}
         onLayout={event => {
@@ -360,4 +385,4 @@ function EffortSlider({values, selected, onSelect}: {values: string[]; selected:
       </View>
     </View>
   );
-}
+});
