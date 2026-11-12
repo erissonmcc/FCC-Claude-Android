@@ -60,6 +60,7 @@ internal class ChatViewModel(application: Application) : AndroidViewModel(applic
     private val deviceToolsInFlight = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
     private val deviceToolsCompleted = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
     private val deviceToolResults = java.util.concurrent.ConcurrentHashMap<String, DeviceToolResult>()
+    private val recoveredNativeRuns = mutableSetOf<String>()
     private val detailSignals = Channel<Unit>(Channel.CONFLATED)
     private var turnGeneration = 0
     private var observersStarted = false
@@ -497,6 +498,7 @@ internal class ChatViewModel(application: Application) : AndroidViewModel(applic
 
     suspend fun loadDetail(id: String, older: Boolean = false) {
         val generation = detailGeneration.intValue
+        var failedTurnRecovery: Pair<ChatSession, String>? = null
         detailLock.withLock {
             if (session.value?.id != id || generation != detailGeneration.intValue) return@withLock
             val snapshotTurnGeneration = turnGeneration
@@ -534,6 +536,14 @@ internal class ChatViewModel(application: Application) : AndroidViewModel(applic
             }
             if (session.value?.id != id || generation != detailGeneration.intValue) return@withLock
             val sessionJson = response.optJSONObject("session") ?: return@withLock
+            val latestRun = response.optJSONObject("run")
+            val latestRunId = latestRun?.optString("id").orEmpty()
+            val latestRunError = latestRun?.optString("error").orEmpty()
+            if (!older && busy.value && latestRun?.optString("status") == "failed" &&
+                latestRunError.contains("No conversation found with session ID", ignoreCase = true) &&
+                latestRunId.isNotBlank() && recoveredNativeRuns.add(latestRunId)) {
+                failedTurnRecovery = sessionJson.toSession() to latestRun.optString("text")
+            }
             val initialHistory = historyGeneration.intValue != generation
             val pages = mutableListOf(response)
             val seenCursors = mutableSetOf<String>()
@@ -652,6 +662,31 @@ internal class ChatViewModel(application: Application) : AndroidViewModel(applic
                         busy.value = sendingSessionId.value == id || run?.optString("status") in setOf("preparing", "running", "stopping")
                     }
                     detailLoadedForSession.value = id
+                }
+            }
+        }
+        failedTurnRecovery?.let { (staleSession, text) ->
+            if (text.isNotBlank() && session.value?.id == staleSession.id) {
+                try {
+                    error.value = "Recuperando sua mensagem em uma nova conversa…"
+                    val replacement = startSession(
+                        staleSession.cwd,
+                        staleSession.model,
+                        staleSession.mode,
+                        staleSession.reasoningEffort,
+                        clearDraft = false,
+                    )
+                    sendMessage(
+                        text,
+                        null,
+                        replacement.cwd,
+                        replacement.reasoningEffort.orEmpty(),
+                        getApplication<Application>().contentResolver,
+                    )
+                } catch (failure: Exception) {
+                    if (failure is CancellationException) throw failure
+                    error.value = "A conversa antiga perdeu o contexto. Sua mensagem continua no histórico; toque em Nova conversa para continuar."
+                    if (draft.value.isBlank()) draft.value = text
                 }
             }
         }
