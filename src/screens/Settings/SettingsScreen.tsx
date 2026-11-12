@@ -29,7 +29,7 @@ export function SettingsScreen({cwd, model, mode, effort, backendUrl, backendTok
   const {styles} = useStyles(stylesheet);
   return <SafeAreaView style={styles.screen}>
       <View style={styles.header}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Voltar" onPress={onClose} style={styles.back}><Image source={require('../../assets/lucide/chevron_right.png')} style={styles.backIcon} /></Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel="Voltar" onPress={onClose} style={styles.back}><Image source={require('../../assets/lucide/arrow_left.png')} style={styles.backIcon} /></Pressable>
         <Text style={styles.title}>Configurações</Text>
       </View>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
