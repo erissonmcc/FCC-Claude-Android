@@ -7,6 +7,7 @@ import { StyleSheet,
   DrawerLayoutAndroid,
   Image,
   Keyboard,
+  type LayoutChangeEvent,
   PanResponder,
   ScrollView,
   StatusBar,
@@ -18,9 +19,10 @@ import { StyleSheet,
   useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets} from 'react-native-safe-area-context';
-import { KeyboardStickyView} from 'react-native-keyboard-controller';
-import { KeyboardAwareLegendList, useKeyboardChatComposerInset, useKeyboardScrollToEnd} from '@legendapp/list/keyboard';
-import type {LegendListRef} from '@legendapp/list/react-native';
+import { KeyboardChatScrollView, KeyboardStickyView} from 'react-native-keyboard-controller';
+import { useKeyboardScrollToEnd} from '@legendapp/list/keyboard';
+import { AnchorItem, StreamingItem, StreamingMessageList, type StreamingMessageListRef } from 'react-native-streaming-message-list';
+import { useSharedValue } from 'react-native-reanimated';
 import Markdown from 'react-native-markdown-display';
 import type {RenderRules} from 'react-native-markdown-display';
 import { useStyles} from 'react-native-unistyles';
@@ -291,13 +293,25 @@ export default function ChatScreen({cwd: initialCwd, model: initialModel, mode: 
   const topBarScrollY = React.useRef(new Animated.Value(0)).current;
   const scrollIdleTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const listDragging = React.useRef(false);
-  const anchorDisabledByUser = React.useRef(false);
   const [composerHeight, setComposerHeight] = useState(112);
-  const [anchorId, setAnchorId] = useState<string | null>(null);
-  const composerRef = React.useRef<View>(null);
-  const listRef = React.useRef<LegendListRef>(null);
-  const {contentInsetEndAdjustment, onComposerLayout} = useKeyboardChatComposerInset(listRef, composerRef, composerHeight + 24);
-  const {freeze, scrollMessageToEnd} = useKeyboardScrollToEnd({listRef});
+  const listRef = React.useRef<StreamingMessageListRef>(null);
+  const contentInsetEndAdjustment = useSharedValue(composerHeight + 24);
+  const lastComposerInset = React.useRef<number | null>(null);
+  const onComposerLayout = useCallback((event: LayoutChangeEvent) => {
+    const height = event.nativeEvent.layout.height;
+    if (height !== lastComposerInset.current) {
+      lastComposerInset.current = height;
+      contentInsetEndAdjustment.value = height;
+    }
+  }, [contentInsetEndAdjustment]);
+  const keyboardListRef = useMemo<Parameters<typeof useKeyboardScrollToEnd>[0]['listRef']>(() => ({
+    get current() {
+      const list = listRef.current;
+      if (!list) return null;
+      return {scrollToEnd: async (options?: Parameters<StreamingMessageListRef['scrollToEnd']>[0]) => { list.scrollToEnd(options); }};
+    },
+  }), []);
+  const {freeze, scrollMessageToEnd} = useKeyboardScrollToEnd({listRef: keyboardListRef});
   const drawerRef = React.useRef<DrawerLayoutAndroid>(null);
   const drawerSwipe = React.useRef(PanResponder.create({
     onMoveShouldSetPanResponderCapture: (_, gesture) => gesture.x0 < 80 && gesture.dx > 28 && gesture.dx > Math.abs(gesture.dy) * 1.8,
@@ -344,8 +358,6 @@ export default function ChatScreen({cwd: initialCwd, model: initialModel, mode: 
 
   useEffect(() => {
     isNearBottom.current = true;
-    anchorDisabledByUser.current = false;
-    setAnchorId(null);
     setShowLatest(false);
     listDragging.current = false;
     setListScrolling(false);
@@ -404,7 +416,6 @@ export default function ChatScreen({cwd: initialCwd, model: initialModel, mode: 
     const value = state.draft;
     if (!value.trim()) return;
     isNearBottom.current = true;
-    anchorDisabledByUser.current = false;
     setShowLatest(false);
     pendingDrafts.current = [];
     const clientMessageId = `rn-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -484,12 +495,16 @@ export default function ChatScreen({cwd: initialCwd, model: initialModel, mode: 
   const scrollToLatest = useCallback((animated: boolean) => {
     void listRef.current?.scrollToEnd({animated});
   }, []);
-  const anchorIndex = rows.findIndex(item => item.id === anchorId);
-  useEffect(() => {
-    if (!state.busy || anchorDisabledByUser.current || (!isNearBottom.current && anchorId === null)) return;
-    const latestUser = [...rows].reverse().find(item => item.kind === 'user');
-    if (latestUser && anchorId !== latestUser.id) setAnchorId(latestUser.id);
-  }, [anchorId, rows, state.busy]);
+  let anchorRowIndex = -1;
+  let streamingRowIndex = -1;
+  rows.forEach((row, index) => {
+    if (row.kind === 'user') {
+      anchorRowIndex = index;
+      streamingRowIndex = -1;
+    } else if (anchorRowIndex >= 0) {
+      streamingRowIndex = index;
+    }
+  });
   const renderAssistantMessage = useCallback((item: Item, inWork = false) => {
     if (!item.text) return null;
     return <View style={inWork ? styles.workAssistantRow : styles.assistantRow}>
@@ -497,28 +512,24 @@ export default function ChatScreen({cwd: initialCwd, model: initialModel, mode: 
       {!item.complete && <View style={styles.streamMarker}><View style={styles.streamDot} /></View>}
     </View>;
   }, []);
-  const renderItem = useCallback(({item}: {item: Item & {work?: Item[]}}) => {
+  const renderItem = useCallback(({item, index}: {item: Item & {work?: Item[]}; index: number}) => {
     let content;
     if (item.work) content = <View style={styles.assistantRow}><WorkActivity items={item.work} run={state.runs[item.runId]} renderMessage={workItem => renderAssistantMessage(workItem as Item, true)} /></View>;
     else if (item.kind === 'user') content = <View style={styles.userRow}><View style={styles.userBubble}><Text selectable style={styles.userText}>{item.text}</Text></View></View>;
     else content = renderAssistantMessage(item);
-    return <View>{content}</View>;
-  }, [renderAssistantMessage, state.runs]);
+    const row = <View>{content}</View>;
+    if (index === anchorRowIndex) return <AnchorItem>{row}</AnchorItem>;
+    if (index === streamingRowIndex) return <StreamingItem>{row}</StreamingItem>;
+    return row;
+  }, [anchorRowIndex, renderAssistantMessage, state.runs, streamingRowIndex]);
 
-  const restoreAnchorIfAtBottom = useCallback(() => {
-    if (!isNearBottom.current) return;
-    anchorDisabledByUser.current = false;
-    const latestUser = [...rows].reverse().find(item => item.kind === 'user');
-    if (latestUser) setAnchorId(latestUser.id);
-  }, [rows]);
   const scheduleScrollIdle = useCallback(() => {
     if (scrollIdleTimer.current !== null) clearTimeout(scrollIdleTimer.current);
     scrollIdleTimer.current = setTimeout(() => {
       if (listDragging.current) return;
       setListScrolling(false);
-      restoreAnchorIfAtBottom();
     }, 160);
-  }, [restoreAnchorIfAtBottom]);
+  }, []);
   const onListScrollBegin = useCallback(() => {
     if (scrollIdleTimer.current !== null) clearTimeout(scrollIdleTimer.current);
     setListScrolling(true);
@@ -526,8 +537,7 @@ export default function ChatScreen({cwd: initialCwd, model: initialModel, mode: 
   const onListScrollEnd = useCallback(() => {
     if (scrollIdleTimer.current !== null) clearTimeout(scrollIdleTimer.current);
     setListScrolling(false);
-    restoreAnchorIfAtBottom();
-  }, [restoreAnchorIfAtBottom]);
+  }, []);
   const onListScroll = useCallback((event: any) => {
     const {contentOffset, contentSize, layoutMeasurement} = event.nativeEvent;
     topBarScrollY.setValue(contentOffset.y);
@@ -566,28 +576,28 @@ export default function ChatScreen({cwd: initialCwd, model: initialModel, mode: 
     <StatusBar backgroundColor="transparent" barStyle="light-content" translucent />
     {!ready || !state.connected ? <View style={styles.loading}><ActivityIndicator color={C.accent} /></View> : <>
       <View style={styles.transcript} {...drawerSwipe.panHandlers}>
-      <KeyboardAwareLegendList
+      <StreamingMessageList
         ref={listRef}
         style={styles.messages}
         data={rows}
         keyExtractor={item => item.id}
         renderItem={renderItem}
-        anchoredEndSpace={anchorIndex >= 0 ? {anchorIndex, anchorOffset: insets.top + 80} : undefined}
         alignItemsAtEnd
-        contentInsetEndAdjustment={contentInsetEndAdjustment}
-        freeze={freeze}
-        initialScrollAtEnd
-        keyboardLiftBehavior="whenAtEnd"
-        keyboardOffset={Math.max(0, insets.bottom - 10)}
-        maintainScrollAtEnd={{animated: true}}
-        maintainVisibleContentPosition
+        isStreaming={state.busy}
         ListHeaderComponent={state.historyCursor ? <Pressable disabled={state.historyLoading} onPress={() => FccChat.loadOlder()} style={styles.loadEarlier}>
           <Text style={styles.loadEarlierText}>{state.historyLoading ? 'Carregando mensagens…' : 'Carregar mensagens anteriores'}</Text>
         </Pressable> : null}
         ListFooterComponent={footer}
         contentContainerStyle={[styles.messagesContent, {paddingTop: insets.top + 80, paddingBottom: 24}]}
+        renderScrollComponent={scrollProps => <KeyboardChatScrollView
+          {...scrollProps}
+          freeze={freeze}
+          extraContentPadding={contentInsetEndAdjustment}
+          keyboardLiftBehavior="whenAtEnd"
+          offset={Math.max(0, insets.bottom - 10)}
+        />}
         onScroll={onListScroll}
-        onScrollBeginDrag={() => { listDragging.current = true; anchorDisabledByUser.current = true; setAnchorId(null); onListScrollBegin(); }}
+        onScrollBeginDrag={() => { listDragging.current = true; onListScrollBegin(); }}
         onScrollEndDrag={() => { listDragging.current = false; scheduleScrollIdle(); }}
         onMomentumScrollBegin={onListScrollBegin}
         onMomentumScrollEnd={onListScrollEnd}
@@ -613,7 +623,7 @@ export default function ChatScreen({cwd: initialCwd, model: initialModel, mode: 
         offset={{opened: Math.max(0, insets.bottom - 10)}}
         onLayout={event => setComposerHeight(Math.ceil(event.nativeEvent.layout.height))}
       >
-      <View ref={composerRef} onLayout={onComposerLayout}>
+      <View onLayout={onComposerLayout}>
       {currentAttachments.length > 0 && <ScrollView horizontal style={styles.attachments} contentContainerStyle={styles.attachmentList}>
         {currentAttachments.map(file => <Pressable key={file.key} onPress={() => FccChat.removeAttachment(file.key)} style={styles.attachmentChip}>
           <Text numberOfLines={1} style={styles.attachmentText}>{file.name}  ×</Text>
