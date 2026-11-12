@@ -1,0 +1,153 @@
+diff --git a/node_modules/react-native-streaming-message-list/lib/commonjs/StreamingMessageList.js b/node_modules/react-native-streaming-message-list/lib/commonjs/StreamingMessageList.js
+index 27350d4..f1ce579 100644
+--- a/node_modules/react-native-streaming-message-list/lib/commonjs/StreamingMessageList.js
++++ b/node_modules/react-native-streaming-message-list/lib/commonjs/StreamingMessageList.js
+@@ -81,6 +81,7 @@ const StreamingMessageList = t0 => {
+   const internalRef = (0, _react.useRef)(null);
+   const listRef = ref ?? internalRef;
+   const prevDataLengthRef = (0, _react.useRef)(0);
++  const userStartedDraggingRef = (0, _react.useRef)(false);
+   const {
+     debouncedPlaceholderHeight,
+     placeholderHeight,
+@@ -168,6 +169,7 @@ const StreamingMessageList = t0 => {
+       const isNewConversationFirstMessage = isStreaming && prevLength === 0 && data.length === 1;
+       const isNewMessageInExistingConversation = isStreaming && !wasStreaming && prevLength >= 2;
+       if (isNewConversationFirstMessage || isNewMessageInExistingConversation) {
++        userStartedDraggingRef.current = false;
+         setWhitespacePhase("active");
+         resetWhitespaceVisibility();
+         setAnchorMessageHeight(0);
+@@ -202,7 +204,7 @@ const StreamingMessageList = t0 => {
+     t7 = (width, height) => {
+       onContentSizeChange?.(width, height);
+       const didPerformInitialScroll = performInitialScroll();
+-      if (!didPerformInitialScroll) {
++      if (!didPerformInitialScroll && !userStartedDraggingRef.current) {
+         performScrollToNewMessage(height);
+       }
+       updateScrollMetricsState(scrollMetricsRef.current.contentOffset, scrollMetricsRef.current.layoutMeasurement, height);
+@@ -289,6 +291,10 @@ const StreamingMessageList = t0 => {
+     t10 = $[61];
+   }
+   const handleEndReached = t10;
++  const handleScrollBeginDrag = event => {
++    userStartedDraggingRef.current = true;
++    restProps.onScrollBeginDrag?.(event);
++  };
+   let t11;
+   if ($[62] !== ListFooterComponent || $[63] !== debouncedPlaceholderHeight || $[64] !== whitespacePhase) {
+     t11 = () => {
+@@ -376,6 +382,7 @@ const StreamingMessageList = t0 => {
+       onEndReachedThreshold: 0.2,
+       onLayout: handleLayout,
+       onScroll: handleScroll,
++      onScrollBeginDrag: handleScrollBeginDrag,
+       renderItem: renderItem,
+       scrollEventThrottle: 16
+     });
+diff --git a/node_modules/react-native-streaming-message-list/lib/module/StreamingMessageList.js b/node_modules/react-native-streaming-message-list/lib/module/StreamingMessageList.js
+index 8c468c8..bae2786 100644
+--- a/node_modules/react-native-streaming-message-list/lib/module/StreamingMessageList.js
++++ b/node_modules/react-native-streaming-message-list/lib/module/StreamingMessageList.js
+@@ -77,6 +77,7 @@ export const StreamingMessageList = t0 => {
+   const internalRef = useRef(null);
+   const listRef = ref ?? internalRef;
+   const prevDataLengthRef = useRef(0);
++  const userStartedDraggingRef = useRef(false);
+   const {
+     debouncedPlaceholderHeight,
+     placeholderHeight,
+@@ -164,6 +165,7 @@ export const StreamingMessageList = t0 => {
+       const isNewConversationFirstMessage = isStreaming && prevLength === 0 && data.length === 1;
+       const isNewMessageInExistingConversation = isStreaming && !wasStreaming && prevLength >= 2;
+       if (isNewConversationFirstMessage || isNewMessageInExistingConversation) {
++        userStartedDraggingRef.current = false;
+         setWhitespacePhase("active");
+         resetWhitespaceVisibility();
+         setAnchorMessageHeight(0);
+@@ -198,7 +200,7 @@ export const StreamingMessageList = t0 => {
+     t7 = (width, height) => {
+       onContentSizeChange?.(width, height);
+       const didPerformInitialScroll = performInitialScroll();
+-      if (!didPerformInitialScroll) {
++      if (!didPerformInitialScroll && !userStartedDraggingRef.current) {
+         performScrollToNewMessage(height);
+       }
+       updateScrollMetricsState(scrollMetricsRef.current.contentOffset, scrollMetricsRef.current.layoutMeasurement, height);
+@@ -285,6 +287,10 @@ export const StreamingMessageList = t0 => {
+     t10 = $[61];
+   }
+   const handleEndReached = t10;
++  const handleScrollBeginDrag = event => {
++    userStartedDraggingRef.current = true;
++    restProps.onScrollBeginDrag?.(event);
++  };
+   let t11;
+   if ($[62] !== ListFooterComponent || $[63] !== debouncedPlaceholderHeight || $[64] !== whitespacePhase) {
+     t11 = () => {
+@@ -372,6 +378,7 @@ export const StreamingMessageList = t0 => {
+       onEndReachedThreshold: 0.2,
+       onLayout: handleLayout,
+       onScroll: handleScroll,
++      onScrollBeginDrag: handleScrollBeginDrag,
+       renderItem: renderItem,
+       scrollEventThrottle: 16
+     });
+diff --git a/node_modules/react-native-streaming-message-list/src/StreamingMessageList.tsx b/node_modules/react-native-streaming-message-list/src/StreamingMessageList.tsx
+index 3da11d2..44746ad 100644
+--- a/node_modules/react-native-streaming-message-list/src/StreamingMessageList.tsx
++++ b/node_modules/react-native-streaming-message-list/src/StreamingMessageList.tsx
+@@ -33,6 +33,7 @@ export const StreamingMessageList = <T,>({
+   ListFooterComponent,
+   ListEmptyComponent,
+   onScroll,
++  onScrollBeginDrag,
+   onContentSizeChange,
+   contentContainerStyle,
+   ref,
+@@ -49,6 +50,7 @@ export const StreamingMessageList = <T,>({
+   const listRef = (ref ?? internalRef) as React.RefObject<LegendListRef | null>;
+ 
+   const prevDataLengthRef = useRef(0);
++  const userStartedDraggingRef = useRef(false);
+ 
+   const {
+     debouncedPlaceholderHeight,
+@@ -121,6 +123,7 @@ export const StreamingMessageList = <T,>({
+       isStreaming && !wasStreaming && prevLength >= 2;
+ 
+     if (isNewConversationFirstMessage || isNewMessageInExistingConversation) {
++      userStartedDraggingRef.current = false;
+       setWhitespacePhase('active');
+       resetWhitespaceVisibility();
+       setAnchorMessageHeight(0);
+@@ -150,7 +153,7 @@ export const StreamingMessageList = <T,>({
+ 
+     const didPerformInitialScroll = performInitialScroll();
+ 
+-    if (!didPerformInitialScroll) {
++    if (!didPerformInitialScroll && !userStartedDraggingRef.current) {
+       performScrollToNewMessage(height);
+     }
+ 
+@@ -161,6 +164,11 @@ export const StreamingMessageList = <T,>({
+     );
+   };
+ 
++  const handleScrollBeginDrag = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
++    userStartedDraggingRef.current = true;
++    onScrollBeginDrag?.(event);
++  };
++
+   const handleLayout = (event: LayoutChangeEvent) => {
+     const height = event.nativeEvent.layout.height;
+     setContainerHeight(height);
+@@ -284,6 +292,7 @@ export const StreamingMessageList = <T,>({
+         onEndReachedThreshold={0.2}
+         onLayout={handleLayout}
+         onScroll={handleScroll}
++        onScrollBeginDrag={handleScrollBeginDrag}
+         renderItem={renderItem}
+         scrollEventThrottle={16}
+       />
