@@ -1,5 +1,5 @@
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
-import {
+import { StyleSheet, 
   ActivityIndicator,
   Animated,
   BackHandler,
@@ -9,7 +9,6 @@ import {
   PanResponder,
   ScrollView,
   StatusBar,
-  StyleSheet,
   Text,
   TextInput,
   type StyleProp,
@@ -17,22 +16,21 @@ import {
   type ViewStyle,
   useWindowDimensions,
 } from 'react-native';
-import {SafeAreaView, useSafeAreaInsets} from 'react-native-safe-area-context';
-import {KeyboardStickyView} from 'react-native-keyboard-controller';
-import {KeyboardAwareLegendList, useKeyboardChatComposerInset, useKeyboardScrollToEnd} from '@legendapp/list/keyboard';
+import { SafeAreaView, useSafeAreaInsets} from 'react-native-safe-area-context';
+import { KeyboardStickyView} from 'react-native-keyboard-controller';
+import { KeyboardAwareLegendList, useKeyboardChatComposerInset, useKeyboardScrollToEnd} from '@legendapp/list/keyboard';
 import type {LegendListRef} from '@legendapp/list/react-native';
 import Markdown from 'react-native-markdown-display';
 import type {RenderRules} from 'react-native-markdown-display';
-import {useStyles} from 'react-native-unistyles';
-import {EffortMenu} from '../../components/EffortMenu/EffortMenu';
-import {GeneratingIndicator} from '../../components/GeneratingIndicator/GeneratingIndicator';
-import {Pressable} from '../../components/Pressable/Pressable';
-import {WorkActivity, type Run} from '../../components/ToolActivity/ToolActivity';
-import {NativeEventEmitter, NativeModules} from 'react-native';
-import {colors as C} from '../../theme';
-import {stylesheet} from './styles';
-import {SettingsScreen} from '../Settings/SettingsScreen';
-import {Header} from '../../components/Header/Header';
+import { useStyles} from 'react-native-unistyles';
+import { EffortMenu} from '../../components/EffortMenu/EffortMenu';
+import { GeneratingIndicator} from '../../components/GeneratingIndicator/GeneratingIndicator';
+import { Pressable} from '../../components/Pressable/Pressable';
+import { WorkActivity, type Run} from '../../components/ToolActivity/ToolActivity';
+import { NativeEventEmitter, NativeModules} from 'react-native';
+import { colors as C} from '../../theme';
+import { stylesheet} from './styles';
+import { Header} from '../../components/Header/Header';
 
 const markdownStyles = {
   body: {backgroundColor: 'transparent'},
@@ -203,7 +201,6 @@ function Action({label, onPress, tint = C.text, disabled = false}: {
   </Pressable>;
 }
 
-
 function PermissionPrompt({prompt, onRespond}: {prompt: Prompt; onRespond: (approved: boolean, answers?: Record<string, any>) => void}) {
   const {styles} = useStyles(stylesheet);
   const questions = Array.isArray(prompt.input?.questions) ? prompt.input.questions : [];
@@ -252,19 +249,32 @@ function PermissionPrompt({prompt, onRespond}: {prompt: Prompt; onRespond: (appr
   </View>;
 }
 
-export default function ChatScreen() {
+type ChatScreenProps = {
+  cwd: string;
+  model: string;
+  mode: string;
+  effort: string;
+  backendUrl: string;
+  backendToken: string;
+  onSettings: () => void;
+  onConfigChange: (next: {
+    cwd: string; model: string; mode: string; effort: string;
+    backendUrl: string; backendToken: string;
+  }) => void;
+};
+
+export default function ChatScreen({cwd: initialCwd, model: initialModel, mode: initialMode, effort: initialEffort, backendUrl: initialBackendUrl, backendToken: initialBackendToken, onSettings, onConfigChange}: ChatScreenProps) {
   const {styles} = useStyles(stylesheet);
-  const [state, setState] = useState<ChatState>(EMPTY);
   const [ready, setReady] = useState(false);
+  const [state, setState] = useState<ChatState>(EMPTY);
+  const [localCwd, setLocalCwd] = useState(initialCwd);
+  const [localModel, setLocalModel] = useState(initialModel);
+  const [localMode, setLocalMode] = useState(initialMode);
+  const [localEffort, setLocalEffort] = useState(initialEffort);
+  const [localBackendUrl, setLocalBackendUrl] = useState(initialBackendUrl);
+  const [localBackendToken, setLocalBackendToken] = useState(initialBackendToken);
   const insets = useSafeAreaInsets();
   const [drawer, setDrawer] = useState(false);
-  const [settings, setSettings] = useState(false);
-  const [backendUrl, setBackendUrl] = useState('https://fcc-backend-v2-sdui.onrender.com');
-  const [backendToken, setBackendToken] = useState('');
-  const [model, setModel] = useState('');
-  const [mode, setMode] = useState('config');
-  const [effort, setEffort] = useState('');
-  const [cwd, setCwd] = useState('/storage/emulated/0');
   const [showLatest, setShowLatest] = useState(false);
   const [listScrolling, setListScrolling] = useState(false);
   const latestOpacity = React.useRef(new Animated.Value(0)).current;
@@ -304,12 +314,6 @@ export default function ChatScreen() {
   }, []);
 
   useEffect(() => {
-    if (!settings) return;
-    const subscription = BackHandler.addEventListener('hardwareBackPress', () => { setSettings(false); return true; });
-    return () => subscription.remove();
-  }, [settings]);
-
-  useEffect(() => {
     if (!drawer) return;
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
       drawerRef.current?.closeDrawer();
@@ -317,6 +321,16 @@ export default function ChatScreen() {
     });
     return () => subscription.remove();
   }, [drawer]);
+
+  const syncConfig = useCallback((next: {cwd: string; model: string; mode: string; effort: string; backendUrl: string; backendToken: string}) => {
+    setLocalCwd(next.cwd);
+    setLocalModel(next.model);
+    setLocalMode(next.mode);
+    setLocalEffort(next.effort);
+    setLocalBackendUrl(next.backendUrl);
+    setLocalBackendToken(next.backendToken);
+    onConfigChange(next);
+  }, [onConfigChange]);
 
   useEffect(() => {
     isNearBottom.current = true;
@@ -341,23 +355,25 @@ export default function ChatScreen() {
       const acknowledged = pendingDrafts.current.lastIndexOf(next.draft);
       if (acknowledged >= 0) pendingDrafts.current.splice(0, acknowledged + 1);
       setState(previous => ({...next, draft: pendingDrafts.current.length ? previous.draft : next.draft}));
-      if (next.session?.cwd) setCwd(next.session.cwd);
-      if (next.session) {
-        setModel(next.session.model ?? '');
-        setMode(next.session.mode || 'config');
-        setEffort(next.session.reasoningEffort ?? '');
+      if (next.session?.cwd) {
+        const cfg = {cwd: next.session.cwd, model: next.session.model ?? '', mode: next.session.mode || 'config', effort: next.session.reasoningEffort ?? '', backendUrl: localBackendUrl, backendToken: localBackendToken};
+        setLocalCwd(cfg.cwd);
+        setLocalModel(cfg.model);
+        setLocalMode(cfg.mode);
+        setLocalEffort(cfg.effort);
+        syncConfig(cfg);
       }
     } catch (error) {
       console.warn('Resposta inválida do serviço de chat FCC', error);
     }
-  }, []);
+  }, [localBackendUrl, localBackendToken, syncConfig]);
 
   useEffect(() => {
     const emitter = new NativeEventEmitter(NativeModules.FccChat);
     const subscription = emitter.addListener('fccStateChanged', applySnapshot);
-    FccChat.getBackendConfig().then(raw => { const config = JSON.parse(raw); setBackendUrl(config.url); setBackendToken(config.token); }).finally(() => FccChat.initialize().then(applySnapshot).catch(error => setState(prev => ({...prev, error: String(error)}))).finally(() => setReady(true)));
+    FccChat.getBackendConfig().then(raw => { const config = JSON.parse(raw); setLocalBackendUrl(config.url); setLocalBackendToken(config.token); syncConfig({cwd: localCwd, model: localModel, mode: localMode, effort: localEffort, backendUrl: config.url, backendToken: config.token}); }).finally(() => FccChat.initialize().then(applySnapshot).catch(error => setState(prev => ({...prev, error: String(error)}))).finally(() => setReady(true)));
     return () => subscription.remove();
-  }, [applySnapshot]);
+  }, [applySnapshot, localCwd, localModel, localMode, localEffort, syncConfig]);
 
   const send = useCallback(async () => {
     const value = state.draft;
@@ -372,11 +388,11 @@ export default function ChatScreen() {
         void scrollMessageToEnd({animated: true, closeKeyboard: false});
       });
       const openSettings = await sending;
-      if (openSettings === true) setSettings(true);
+      if (openSettings === true) onSettings();
     } catch (error) {
       console.warn('Não foi possível enviar a mensagem', error);
     }
-  }, [scrollMessageToEnd, state.draft]);
+  }, [onSettings, scrollMessageToEnd, state.draft]);
 
   const currentAttachments = state.attachments.filter(item => item.sessionId === state.session?.id);
 
@@ -463,8 +479,6 @@ export default function ChatScreen() {
     scheduleScrollIdle();
   }, [scheduleScrollIdle, topBarScrollY]);
 
-  if (settings) return <SettingsScreen cwd={cwd} model={model} mode={mode} effort={effort} backendUrl={backendUrl} backendToken={backendToken} message={state.bootstrap?.message} onClose={() => setSettings(false)} onChooseFolder={async () => { const selected = await FccChat.chooseProjectFolder(cwd); if (selected) setCwd(selected); }} onChangeCwd={setCwd} onChangeModel={setModel} onChangeMode={setMode} onChangeEffort={setEffort} onChangeBackendUrl={setBackendUrl} onChangeBackendToken={setBackendToken} onSave={async () => { await FccChat.configureBackend(backendUrl, backendToken); await FccChat.applySettings(cwd, model, mode, effort); await FccChat.refresh(); setSettings(false); }} />;
-
   return <DrawerLayoutAndroid
     ref={drawerRef}
     style={styles.screen}
@@ -479,8 +493,8 @@ export default function ChatScreen() {
       state={state}
       onSelect={id => { drawerRef.current?.closeDrawer(); FccChat.selectSession(id); }}
       onMenu={(id, tag) => { FccChat.showSessionMenu(id, tag).catch(console.warn); }}
-      onNew={() => { drawerRef.current?.closeDrawer(); FccChat.newSession(cwd, '', 'config', ''); }}
-      onSettings={() => { drawerRef.current?.closeDrawer(); setSettings(true); }}
+      onNew={() => { drawerRef.current?.closeDrawer(); FccChat.newSession(localCwd, '', 'config', ''); }}
+      onSettings={onSettings}
     />}
   >
   <SafeAreaView edges={['bottom', 'left', 'right']} style={styles.screen}>
@@ -561,13 +575,14 @@ export default function ChatScreen() {
         <View style={styles.composerControls}>
         <IconButton icon="plus" label="Anexar arquivos" onPress={() => FccChat.pickAttachments()} />
         <EffortMenu
-          modelId={model || state.bootstrap?.default_model || ""}
+          modelId={localModel || state.bootstrap?.default_model || ""}
           models={state.bootstrap?.models || []}
-          effort={effort}
-          onSelectEffort={value => { setEffort(value); void FccChat.applySettings(cwd, model, mode, value); }}
+          effort={localEffort}
+          onSelectEffort={value => { setLocalEffort(value); syncConfig({cwd: localCwd, model: localModel, mode: localMode, effort: value, backendUrl: localBackendUrl, backendToken: localBackendToken}); void FccChat.applySettings(localCwd, localModel, localMode, value); }}
           onSelectModel={newModel => {
-            setModel(newModel);
-            void FccChat.applySettings(cwd, newModel, mode, effort);
+            setLocalModel(newModel);
+            syncConfig({cwd: localCwd, model: newModel, mode: localMode, effort: localEffort, backendUrl: localBackendUrl, backendToken: localBackendToken});
+            void FccChat.applySettings(localCwd, newModel, localMode, localEffort);
           }}
         />
         {state.busy && !state.draft.trim()
@@ -581,14 +596,14 @@ export default function ChatScreen() {
     </>}
     <Header
       title={state.session?.title || 'FCC Claude'}
-      path={state.session?.cwd || cwd}
+      path={state.session?.cwd || localCwd}
       busy={state.busy}
       scrollY={topBarScrollY}
       onOpenDrawer={() => drawerRef.current?.openDrawer()}
-      onNewConversation={() => FccChat.newSession(cwd, '', 'config', '')}
+      onNewConversation={() => FccChat.newSession(localCwd, '', 'config', '')}
       onRefresh={() => { void FccChat.refresh(); }}
       onStop={() => FccChat.stop()}
-      onSettings={() => setSettings(true)}
+      onSettings={onSettings}
     />
     {!!state.error && <Pressable accessibilityRole="button" onPress={() => FccChat.refresh()} style={[styles.errorBanner, {top: insets.top + 80}]}><Text style={styles.errorText}>{state.error}</Text></Pressable>}
 
