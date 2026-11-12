@@ -293,6 +293,7 @@ export default function ChatScreen({cwd: initialCwd, model: initialModel, mode: 
   const topBarScrollY = React.useRef(new Animated.Value(0)).current;
   const scrollIdleTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const listDragging = React.useRef(false);
+  const previousScrollOffset = React.useRef<number | null>(null);
   const [composerHeight, setComposerHeight] = useState(112);
   const listRef = React.useRef<StreamingMessageListRef>(null);
   const contentInsetEndAdjustment = useSharedValue(composerHeight + 24);
@@ -540,12 +541,17 @@ export default function ChatScreen({cwd: initialCwd, model: initialModel, mode: 
   }, []);
   const onListScroll = useCallback((event: any) => {
     const {contentOffset, contentSize, layoutMeasurement} = event.nativeEvent;
+    const previousOffset = previousScrollOffset.current;
+    if (contentOffset.y <= 1 && previousOffset !== null && previousOffset > 1) {
+      console.warn('[scroll-diag] offset reached zero', {previousOffset, busy: state.busy, contentHeight: contentSize.height, viewportHeight: layoutMeasurement.height});
+    }
+    previousScrollOffset.current = contentOffset.y;
     topBarScrollY.setValue(contentOffset.y);
     isNearBottom.current = contentOffset.y + layoutMeasurement.height >= contentSize.height - 120;
     setShowLatest(!isNearBottom.current);
     setListScrolling(true);
     scheduleScrollIdle();
-  }, [scheduleScrollIdle, topBarScrollY]);
+  }, [scheduleScrollIdle, state.busy, topBarScrollY]);
 
   return <DrawerLayoutAndroid
     ref={drawerRef}
@@ -597,10 +603,10 @@ export default function ChatScreen({cwd: initialCwd, model: initialModel, mode: 
           offset={Math.max(0, insets.bottom - 10)}
         />}
         onScroll={onListScroll}
-        onScrollBeginDrag={() => { listDragging.current = true; onListScrollBegin(); }}
-        onScrollEndDrag={() => { listDragging.current = false; scheduleScrollIdle(); }}
+        onScrollBeginDrag={event => { console.warn('[scroll-diag] begin drag', event.nativeEvent.contentOffset.y); listDragging.current = true; onListScrollBegin(); }}
+        onScrollEndDrag={event => { console.warn('[scroll-diag] end drag', event.nativeEvent.contentOffset.y); listDragging.current = false; scheduleScrollIdle(); }}
         onMomentumScrollBegin={onListScrollBegin}
-        onMomentumScrollEnd={onListScrollEnd}
+        onMomentumScrollEnd={event => { console.warn('[scroll-diag] momentum end', event.nativeEvent.contentOffset.y); onListScrollEnd(); }}
         scrollEventThrottle={16}
         keyboardShouldPersistTaps="handled"
       />

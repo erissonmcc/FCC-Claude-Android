@@ -58,6 +58,26 @@ index 27350d4..13e3770 100644
        renderItem: renderItem,
        scrollEventThrottle: 16
      });
+diff --git a/node_modules/react-native-streaming-message-list/lib/commonjs/hooks/useScrollBehavior.js b/node_modules/react-native-streaming-message-list/lib/commonjs/hooks/useScrollBehavior.js
+index 53ddefa..d9439ca 100644
+--- a/node_modules/react-native-streaming-message-list/lib/commonjs/hooks/useScrollBehavior.js
++++ b/node_modules/react-native-streaming-message-list/lib/commonjs/hooks/useScrollBehavior.js
+@@ -74,6 +74,7 @@ const useScrollBehavior = t0 => {
+       const isNewConversationFirstMessage = isStreaming && data.length <= 2;
+       const shouldScrollToEnd = isExistingThread && !isNewConversationFirstMessage;
+       if (shouldScrollToEnd) {
++        console.warn('[scroll-diag] StreamingMessageList initial scrollToEnd', { dataLength: data.length, contentOffset: scrollMetricsRef.current.contentOffset });
+         messagesListRef.current?.scrollToEnd({
+           animated: false
+         });
+@@ -109,6 +110,7 @@ const useScrollBehavior = t0 => {
+       }
+       const baseOffset = (0, _scrollCalculations.calculateScrollOffsetForNewMessage)(contentHeight, placeholderHeight, anchorMessageHeight);
+       const scrollOffset = Math.max(0, baseOffset - paddingTop);
++      console.warn('[scroll-diag] StreamingMessageList pin scrollToOffset', { scrollOffset, contentHeight, placeholderHeight, anchorMessageHeight, paddingTop, containerHeight });
+       messagesListRef.current?.scrollToOffset({
+         offset: scrollOffset,
+         animated: true
 diff --git a/node_modules/react-native-streaming-message-list/lib/module/StreamingMessageList.js b/node_modules/react-native-streaming-message-list/lib/module/StreamingMessageList.js
 index 8c468c8..1bfa42b 100644
 --- a/node_modules/react-native-streaming-message-list/lib/module/StreamingMessageList.js
@@ -118,6 +138,26 @@ index 8c468c8..1bfa42b 100644
        renderItem: renderItem,
        scrollEventThrottle: 16
      });
+diff --git a/node_modules/react-native-streaming-message-list/lib/module/hooks/useScrollBehavior.js b/node_modules/react-native-streaming-message-list/lib/module/hooks/useScrollBehavior.js
+index d2367ac..6694c19 100644
+--- a/node_modules/react-native-streaming-message-list/lib/module/hooks/useScrollBehavior.js
++++ b/node_modules/react-native-streaming-message-list/lib/module/hooks/useScrollBehavior.js
+@@ -70,6 +70,7 @@ export const useScrollBehavior = t0 => {
+       const isNewConversationFirstMessage = isStreaming && data.length <= 2;
+       const shouldScrollToEnd = isExistingThread && !isNewConversationFirstMessage;
+       if (shouldScrollToEnd) {
++        console.warn('[scroll-diag] StreamingMessageList initial scrollToEnd', { dataLength: data.length, contentOffset: scrollMetricsRef.current.contentOffset });
+         messagesListRef.current?.scrollToEnd({
+           animated: false
+         });
+@@ -105,6 +106,7 @@ export const useScrollBehavior = t0 => {
+       }
+       const baseOffset = calculateScrollOffsetForNewMessage(contentHeight, placeholderHeight, anchorMessageHeight);
+       const scrollOffset = Math.max(0, baseOffset - paddingTop);
++      console.warn('[scroll-diag] StreamingMessageList pin scrollToOffset', { scrollOffset, contentHeight, placeholderHeight, anchorMessageHeight, paddingTop, containerHeight });
+       messagesListRef.current?.scrollToOffset({
+         offset: scrollOffset,
+         animated: true
 diff --git a/node_modules/react-native-streaming-message-list/src/StreamingMessageList.tsx b/node_modules/react-native-streaming-message-list/src/StreamingMessageList.tsx
 index 3da11d2..aceae3d 100644
 --- a/node_modules/react-native-streaming-message-list/src/StreamingMessageList.tsx
@@ -191,3 +231,23 @@ index 3da11d2..aceae3d 100644
          renderItem={renderItem}
          scrollEventThrottle={16}
        />
+diff --git a/node_modules/react-native-streaming-message-list/src/hooks/useScrollBehavior.ts b/node_modules/react-native-streaming-message-list/src/hooks/useScrollBehavior.ts
+index e8916fa..75b4384 100644
+--- a/node_modules/react-native-streaming-message-list/src/hooks/useScrollBehavior.ts
++++ b/node_modules/react-native-streaming-message-list/src/hooks/useScrollBehavior.ts
+@@ -76,6 +76,7 @@ export const useScrollBehavior = ({
+       isExistingThread && !isNewConversationFirstMessage;
+ 
+     if (shouldScrollToEnd) {
++      console.warn('[scroll-diag] StreamingMessageList initial scrollToEnd', {dataLength: data.length, contentOffset: scrollMetricsRef.current.contentOffset});
+       messagesListRef.current?.scrollToEnd({ animated: false });
+       setHasPerformedInitialScrollToEnd(true);
+       return true;
+@@ -106,6 +107,7 @@ export const useScrollBehavior = ({
+     );
+     const scrollOffset = Math.max(0, baseOffset - paddingTop);
+ 
++    console.warn('[scroll-diag] StreamingMessageList pin scrollToOffset', {scrollOffset, contentHeight, placeholderHeight, anchorMessageHeight, paddingTop, containerHeight});
+     messagesListRef.current?.scrollToOffset({
+       offset: scrollOffset,
+       animated: true,
