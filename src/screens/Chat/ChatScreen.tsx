@@ -292,7 +292,9 @@ export default function ChatScreen({cwd: initialCwd, model: initialModel, mode: 
   const latestOpacity = React.useRef(new Animated.Value(0)).current;
   const topBarScrollY = React.useRef(new Animated.Value(0)).current;
   const scrollIdleTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scrollDiagnosticTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const listDragging = React.useRef(false);
+  const scrollDiagnosticActive = React.useRef(false);
   const previousScrollOffset = React.useRef<number | null>(null);
   const [composerHeight, setComposerHeight] = useState(112);
   const listRef = React.useRef<StreamingMessageListRef>(null);
@@ -336,6 +338,7 @@ export default function ChatScreen({cwd: initialCwd, model: initialModel, mode: 
 
   useEffect(() => () => {
     if (scrollIdleTimer.current !== null) clearTimeout(scrollIdleTimer.current);
+    if (scrollDiagnosticTimer.current !== null) clearTimeout(scrollDiagnosticTimer.current);
   }, []);
 
   useEffect(() => {
@@ -542,8 +545,15 @@ export default function ChatScreen({cwd: initialCwd, model: initialModel, mode: 
   const onListScroll = useCallback((event: any) => {
     const {contentOffset, contentSize, layoutMeasurement} = event.nativeEvent;
     const previousOffset = previousScrollOffset.current;
-    if (contentOffset.y <= 1 && previousOffset !== null && previousOffset > 1) {
-      console.warn('[scroll-diag] offset reached zero', {previousOffset, busy: state.busy, contentHeight: contentSize.height, viewportHeight: layoutMeasurement.height});
+    if (scrollDiagnosticActive.current) {
+      console.warn('[scroll-diag] offset sample', {
+        previousOffset,
+        offset: contentOffset.y,
+        dragging: listDragging.current,
+        busy: state.busy,
+        contentHeight: contentSize.height,
+        viewportHeight: layoutMeasurement.height,
+      });
     }
     previousScrollOffset.current = contentOffset.y;
     topBarScrollY.setValue(contentOffset.y);
@@ -603,10 +613,32 @@ export default function ChatScreen({cwd: initialCwd, model: initialModel, mode: 
           offset={Math.max(0, insets.bottom - 10)}
         />}
         onScroll={onListScroll}
-        onScrollBeginDrag={event => { console.warn('[scroll-diag] begin drag', event.nativeEvent.contentOffset.y); listDragging.current = true; onListScrollBegin(); }}
-        onScrollEndDrag={event => { console.warn('[scroll-diag] end drag', event.nativeEvent.contentOffset.y); listDragging.current = false; scheduleScrollIdle(); }}
-        onMomentumScrollBegin={onListScrollBegin}
-        onMomentumScrollEnd={event => { console.warn('[scroll-diag] momentum end', event.nativeEvent.contentOffset.y); onListScrollEnd(); }}
+        onScrollBeginDrag={event => {
+          if (scrollDiagnosticTimer.current !== null) clearTimeout(scrollDiagnosticTimer.current);
+          scrollDiagnosticActive.current = true;
+          listDragging.current = true;
+          console.warn('[scroll-diag] begin drag', {offset: event.nativeEvent.contentOffset.y});
+          onListScrollBegin();
+        }}
+        onScrollEndDrag={event => {
+          listDragging.current = false;
+          console.warn('[scroll-diag] end drag', {offset: event.nativeEvent.contentOffset.y});
+          if (scrollDiagnosticTimer.current !== null) clearTimeout(scrollDiagnosticTimer.current);
+          scrollDiagnosticTimer.current = setTimeout(() => { scrollDiagnosticActive.current = false; }, 2000);
+          scheduleScrollIdle();
+        }}
+        onMomentumScrollBegin={event => {
+          if (scrollDiagnosticTimer.current !== null) clearTimeout(scrollDiagnosticTimer.current);
+          scrollDiagnosticActive.current = true;
+          console.warn('[scroll-diag] momentum begin', {offset: event.nativeEvent.contentOffset.y});
+          onListScrollBegin();
+        }}
+        onMomentumScrollEnd={event => {
+          console.warn('[scroll-diag] momentum end', {offset: event.nativeEvent.contentOffset.y});
+          onListScrollEnd();
+          if (scrollDiagnosticTimer.current !== null) clearTimeout(scrollDiagnosticTimer.current);
+          scrollDiagnosticTimer.current = setTimeout(() => { scrollDiagnosticActive.current = false; }, 2000);
+        }}
         scrollEventThrottle={16}
         keyboardShouldPersistTaps="handled"
       />
