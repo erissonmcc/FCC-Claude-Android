@@ -56,7 +56,7 @@ export function EffortMenu({
 
   const showModels = () => {
     setView('models');
-    panelHeight.value = withTiming(344, {duration: 260});
+    panelHeight.value = withTiming(300, {duration: 260});
   };
 
   const showEffort = () => {

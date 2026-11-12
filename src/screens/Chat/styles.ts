@@ -7,7 +7,7 @@ export const stylesheet = createStyleSheet(theme => ({
   messages: {flex: 1, backgroundColor: theme.colors.backdrop}, messagesContent: {flexGrow: 1, paddingTop: theme.spacing.md, paddingBottom: theme.spacing.lg},
   transcript: {flex: 1}, latestButton: {width: 38, height: 38, borderRadius: 19, backgroundColor: theme.colors.raised, borderWidth: 1, borderColor: theme.colors.line, alignItems: 'center', justifyContent: 'center'}, latestText: {color: theme.colors.text, fontSize: 22},
   transcriptBottomFade: {position: 'absolute', left: 0, right: 0, bottom: 0},
-  loading: {flex: 1, alignItems: 'center', justifyContent: 'center'},
+  loading: {flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#000000'}, loadingIcon: {width: 112, height: 112}, loadingError: {color: theme.colors.muted, fontSize: theme.typography.sm, textAlign: 'center', marginTop: 20, marginHorizontal: 32},
   errorBanner: {position: 'absolute', left: 16, right: 16, zIndex: 10, paddingHorizontal: 14, paddingVertical: theme.spacing.sm, borderRadius: 12, backgroundColor: '#482F2B'}, errorText: {color: theme.colors.danger, fontSize: theme.typography.sm},
   emptyOverlay: {position: 'absolute', left: 0, right: 0},
   emptyState: {flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: theme.spacing.xxl}, emptyTitle: {color: theme.colors.text, fontSize: theme.typography.title, fontWeight: '600', marginBottom: theme.spacing.sm},

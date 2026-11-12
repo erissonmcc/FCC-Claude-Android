@@ -11,7 +11,7 @@ export const stylesheet = createStyleSheet(theme => ({
   overlay: {...StyleSheet.absoluteFillObject, zIndex: 100, elevation: 20},
   panelFade: {
     position: 'absolute',
-    height: 344,
+    height: 300,
     elevation: 12,
   },
   panelAnchor: {position: 'absolute', left: 0, right: 0, bottom: 0},
@@ -24,7 +24,7 @@ export const stylesheet = createStyleSheet(theme => ({
     borderWidth: 1,
     borderColor: '#FFFFFF24',
   },
-  panelContent: {flex: 1, justifyContent: 'flex-end', paddingHorizontal: theme.spacing.lg, paddingTop: theme.spacing.md, paddingBottom: theme.spacing.sm},
+  panelContent: {flex: 1, justifyContent: 'flex-end', paddingHorizontal: theme.spacing.md, paddingVertical: theme.spacing.sm},
   heading: {flexDirection: 'row', alignItems: 'center'},
   previewTitle: {flex: 1, textAlign: 'center', color: '#60A5FA', fontSize: theme.typography.lg, fontWeight: '500'},
   resetIcon: {width: 18, height: 18, tintColor: theme.colors.muted},
@@ -40,7 +40,7 @@ export const stylesheet = createStyleSheet(theme => ({
   modelsHeader: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6},
   backButton: {width: 32, height: 32, alignItems: 'center', justifyContent: 'center', borderRadius: 16},
   modelsTitle: {color: theme.colors.muted, fontSize: theme.typography.base, fontWeight: '500'},
-  modelsList: {height: 280, flexGrow: 0, flexShrink: 0},
+  modelsList: {height: 236, flexGrow: 0, flexShrink: 0},
   modelsListContent: {paddingBottom: theme.spacing.xs},
   modelItem: {
     flexDirection: 'row',

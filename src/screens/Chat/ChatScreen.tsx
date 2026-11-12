@@ -32,6 +32,7 @@ import { NativeEventEmitter, NativeModules} from 'react-native';
 import { colors as C} from '../../theme';
 import { stylesheet} from './styles';
 import { Header} from '../../components/Header/Header';
+import splashIcon from '../../assets/fcc-splash-icon.png';
 
 const markdownStyles = {
   body: {backgroundColor: 'transparent'},
@@ -500,7 +501,7 @@ export default function ChatScreen({cwd: initialCwd, model: initialModel, mode: 
   >
   <SafeAreaView edges={['bottom', 'left', 'right']} style={styles.screen}>
     <StatusBar backgroundColor="transparent" barStyle="light-content" translucent />
-    {!ready ? <View style={styles.loading}><ActivityIndicator color={C.accent} /></View> : <>
+    {!ready || !state.connected ? <View style={styles.loading}><Image source={splashIcon} style={styles.loadingIcon} resizeMode="contain" />{ready && state.error ? <Text style={styles.loadingError}>{state.error}</Text> : null}</View> : <>
       <View style={styles.transcript} {...drawerSwipe.panHandlers}>
       <KeyboardAwareLegendList
         ref={listRef}
