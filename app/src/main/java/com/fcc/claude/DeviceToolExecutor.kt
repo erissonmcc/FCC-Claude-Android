@@ -2,18 +2,20 @@ package com.fcc.claude
 
 import org.json.JSONObject
 import java.io.File
-import java.io.ByteArrayOutputStream
-import java.util.concurrent.TimeUnit
 
 internal data class DeviceToolResult(val text: String, val isError: Boolean)
 
 internal class DeviceToolExecutor(
     private val root: File,
     private val storageAccessGranted: () -> Boolean,
-    private val commandRunner: (File, String) -> DeviceToolResult = ::runShellCommand,
+    private val commandRunner: (File, String) -> DeviceToolResult = { _, _ ->
+        DeviceToolResult("A execução de comandos precisa ser encaminhada ao Termux.", true)
+    },
 ) {
     fun execute(tool: String, input: JSONObject): DeviceToolResult = try {
-        if (!storageAccessGranted()) error("Conceda ao FCC o acesso a todos os arquivos nas configurações do Android.")
+        if (tool != "run_command" && !storageAccessGranted()) {
+            error("Conceda ao FCC o acesso a todos os arquivos nas configurações do Android.")
+        }
         val result = when (tool) {
             "read_file" -> {
                 val file = resolve(input.getString("path")); require(file.isFile) { "Arquivo não encontrado." }
@@ -97,22 +99,5 @@ internal class DeviceToolExecutor(
         private const val MAX_BYTES = 512 * 1024
         private const val MAX_ENTRIES = 500
         private const val MAX_SCAN_FILES = 5000
-        private fun runShellCommand(cwd: File, command: String): DeviceToolResult {
-            val process = ProcessBuilder("/system/bin/sh", "-c", command).directory(cwd).redirectErrorStream(true).start()
-            val output = ByteArrayOutputStream()
-            val reader = Thread {
-                process.inputStream.use { input ->
-                    val buffer = ByteArray(8192); var kept = 0
-                    while (true) {
-                        val count = input.read(buffer); if (count < 0) break
-                        val accepted = minOf(count, MAX_BYTES - kept)
-                        if (accepted > 0) { output.write(buffer, 0, accepted); kept += accepted }
-                    }
-                }
-            }.apply { isDaemon = true; start() }
-            if (!process.waitFor(60, TimeUnit.SECONDS)) { process.destroyForcibly(); error("Comando excedeu 60 segundos.") }
-            reader.join(5_000)
-            return DeviceToolResult("${output.toString(Charsets.UTF_8)}\n(exit ${process.exitValue()})".take(MAX_BYTES), process.exitValue() != 0)
-        }
     }
 }

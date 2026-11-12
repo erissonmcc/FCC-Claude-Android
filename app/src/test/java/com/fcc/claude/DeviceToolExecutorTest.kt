@@ -65,6 +65,24 @@ class DeviceToolExecutorTest {
     }
 
     @Test
+    fun forwardsCommandsWithoutRequiringAppFileAccess() {
+        val root = Files.createTempDirectory("device-tool-command-no-file-access").toFile()
+        try {
+            val executor = DeviceToolExecutor(
+                root,
+                storageAccessGranted = { false },
+                commandRunner = { _, command -> DeviceToolResult("ran:$command", false) },
+            )
+            val result = executor.execute("run_command", JSONObject().put("command", "pwd"))
+
+            assertFalse(result.isError)
+            assertEquals("ran:pwd", result.text)
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
     fun refusesLocalToolsUntilAllFilesAccessIsGranted() {
         val root = Files.createTempDirectory("device-tool-no-access").toFile()
         try {

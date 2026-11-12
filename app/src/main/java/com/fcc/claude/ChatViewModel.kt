@@ -479,6 +479,8 @@ internal class ChatViewModel(application: Application) : AndroidViewModel(applic
             try {
                 val result = deviceToolResults[prompt.id] ?: DeviceToolExecutor(java.io.File(root), {
                     android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.R || android.os.Environment.isExternalStorageManager()
+                }, commandRunner = { cwd, command ->
+                    TermuxCommandExecutor(getApplication()).execute(cwd, command)
                 }).execute(prompt.tool, prompt.input).also { deviceToolResults[prompt.id] = it }
                 ChatRepository.post("/admin/api/code/sessions/$sessionId/prompts/${prompt.id}/responses",
                     JSONObject().put("response_id", java.util.UUID.randomUUID().toString())

@@ -1,6 +1,11 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="com.termux.permission.RUN_COMMAND" />
+
+    <queries>
+        <package android:name="com.termux" />
+    </queries>
 
     <application
         android:name=".CrashApplication"
@@ -10,6 +15,9 @@
         android:label="FCC Claude"
         android:theme="@style/AppTheme"
         android:usesCleartextTraffic="true">
+        <receiver
+            android:name=".TermuxCommandResultReceiver"
+            android:exported="false" />
         <activity
             android:name=".CrashActivity"
             android:exported="false"
