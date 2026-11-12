@@ -23,8 +23,18 @@ internal object ChatRepository {
     fun defaultWorkingDirectory(): String =
         if (baseUrl.startsWith("https://")) "/opt/render/project/src/data/workspace" else "/storage/emulated/0"
 
+    fun localWorkspace(context: android.content.Context): String = context.getSharedPreferences("fcc_backend", android.content.Context.MODE_PRIVATE)
+        .getString("local_workspace", "/storage/emulated/0") ?: "/storage/emulated/0"
+
+    fun configureLocalWorkspace(context: android.content.Context, path: String) {
+        val normalized = java.io.File(path.trim()).canonicalPath
+        require(normalized.startsWith("/storage/")) { "A pasta local precisa ficar no armazenamento compartilhado do aparelho." }
+        context.getSharedPreferences("fcc_backend", android.content.Context.MODE_PRIVATE).edit().putString("local_workspace", normalized).apply()
+    }
+
     fun config(context: android.content.Context) = context.getSharedPreferences("fcc_backend", android.content.Context.MODE_PRIVATE).let {
         org.json.JSONObject().put("url", it.getString("url", "https://fcc-backend-v2-sdui.onrender.com")).put("token", it.getString("token", ""))
+            .put("local_workspace", it.getString("local_workspace", "/storage/emulated/0"))
     }
 
     private fun authorize(connection: java.net.HttpURLConnection) {

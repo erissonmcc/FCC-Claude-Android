@@ -106,7 +106,7 @@ internal data class ChatSession(
     val mode: String,
 )
 
-internal data class PermissionCard(val id: String, val tool: String, val input: JSONObject)
+internal data class PermissionCard(val id: String, val tool: String, val input: JSONObject, val kind: String = "permission")
 
 internal fun buildChatRows(
     items: List<ChatItem>,

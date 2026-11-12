@@ -13,6 +13,9 @@ type Props = {
   effort: string;
   backendUrl: string;
   backendToken: string;
+  localWorkspace: string;
+  fileAccess: boolean;
+  onOpenFileAccess: () => void;
   message?: string;
   onClose: () => void;
   onChooseFolder: () => void;
@@ -22,10 +25,11 @@ type Props = {
   onChangeEffort: (value: string) => void;
   onChangeBackendUrl: (value: string) => void;
   onChangeBackendToken: (value: string) => void;
+  onChangeLocalWorkspace: (value: string) => void;
   onSave: () => void;
 };
 
-export function SettingsScreen({cwd, model, mode, effort, backendUrl, backendToken, message, onClose, onChooseFolder, onChangeCwd, onChangeModel, onChangeMode, onChangeEffort, onChangeBackendUrl, onChangeBackendToken, onSave}: Props) {
+export function SettingsScreen({cwd, model, mode, effort, backendUrl, backendToken, localWorkspace, fileAccess, onOpenFileAccess, message, onClose, onChooseFolder, onChangeCwd, onChangeModel, onChangeMode, onChangeEffort, onChangeBackendUrl, onChangeBackendToken, onChangeLocalWorkspace, onSave}: Props) {
   const {styles} = useStyles(stylesheet);
   return <SafeAreaView style={styles.screen}>
       <View style={styles.header}>
@@ -43,6 +47,12 @@ export function SettingsScreen({cwd, model, mode, effort, backendUrl, backendTok
         <Text style={styles.fieldLabel}>Pasta do projeto</Text>
         <TextInput value={cwd} onChangeText={onChangeCwd} style={styles.textField} placeholderTextColor={colors.muted} />
         <SettingAction label="Escolher pasta" tint={colors.accent} onPress={onChooseFolder} />
+        <Text style={styles.fieldLabel}>Pasta local das ferramentas do Claude</Text>
+        <TextInput value={localWorkspace} onChangeText={onChangeLocalWorkspace} autoCapitalize="none" style={styles.textField} placeholder="/storage/emulated/0/AndroidIDEProjects" placeholderTextColor={colors.muted} />
+        <Text style={styles.muted}>O SDK fica no Render; leitura, edição e comandos usam esta pasta no celular.</Text>
+        <Text style={styles.fieldLabel}>Acesso aos arquivos do celular</Text>
+        <Text style={styles.muted}>{fileAccess ? 'Acesso concedido.' : 'Necessário para as ferramentas do Claude lerem e alterarem arquivos locais.'}</Text>
+        {!fileAccess && <SettingAction label="Conceder acesso a todos os arquivos" tint={colors.accent} onPress={onOpenFileAccess} />}
         </View>
         <Text style={styles.section}>Assistente</Text>
         <View style={styles.card}>

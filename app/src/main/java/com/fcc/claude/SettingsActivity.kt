@@ -20,6 +20,7 @@ class SettingsActivity : ReactActivity() {
                 putString("effort", intent.getStringExtra("fcc_effort"))
                 putString("backendUrl", intent.getStringExtra("fcc_backend_url"))
                 putString("backendToken", intent.getStringExtra("fcc_backend_token"))
+                putString("localWorkspace", intent.getStringExtra("fcc_local_workspace"))
             }
         }
 

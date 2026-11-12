@@ -16,6 +16,8 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.collect
 import java.io.IOException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.json.JSONArray
@@ -55,6 +57,9 @@ internal class ChatViewModel(application: Application) : AndroidViewModel(applic
     var feedConnected = mutableStateOf(false)
 
     private val detailLock = Mutex()
+    private val deviceToolsInFlight = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+    private val deviceToolsCompleted = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+    private val deviceToolResults = java.util.concurrent.ConcurrentHashMap<String, DeviceToolResult>()
     private val detailSignals = Channel<Unit>(Channel.CONFLATED)
     private var turnGeneration = 0
     private var observersStarted = false
@@ -465,6 +470,31 @@ internal class ChatViewModel(application: Application) : AndroidViewModel(applic
         }
     }
 
+    private fun dispatchDeviceTool(sessionId: String, prompt: PermissionCard) {
+        if (prompt.kind != "device_tool" || prompt.id in deviceToolsCompleted || !deviceToolsInFlight.add(prompt.id)) return
+        val sessionCwd = session.value?.cwd.orEmpty()
+        val root = if (sessionCwd.startsWith("/storage/")) sessionCwd else ChatRepository.localWorkspace(getApplication())
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val result = deviceToolResults[prompt.id] ?: DeviceToolExecutor(java.io.File(root), {
+                    android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.R || android.os.Environment.isExternalStorageManager()
+                }).execute(prompt.tool, prompt.input).also { deviceToolResults[prompt.id] = it }
+                ChatRepository.post("/admin/api/code/sessions/$sessionId/prompts/${prompt.id}/responses",
+                    JSONObject().put("response_id", java.util.UUID.randomUUID().toString())
+                        .put("answer", JSONObject().put("device_tool_result", result.text).put("is_error", result.isError)))
+                withContext(Dispatchers.Main.immediate) {
+                    deviceToolsCompleted.add(prompt.id)
+                    deviceToolResults.remove(prompt.id)
+                    loadDetail(sessionId)
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                withContext(Dispatchers.Main.immediate) { error.value = failure.message ?: "Não foi possível executar a ferramenta no celular." }
+            } finally { deviceToolsInFlight.remove(prompt.id) }
+        }
+    }
+
     suspend fun loadDetail(id: String, older: Boolean = false) {
         val generation = detailGeneration.intValue
         detailLock.withLock {
@@ -572,7 +602,8 @@ internal class ChatViewModel(application: Application) : AndroidViewModel(applic
                 val prompt = promptJson.optJSONObject(index) ?: continue
                 if (prompt.optString("status") != "pending") continue
                 val form = prompt.optJSONObject("form") ?: JSONObject()
-                parsedPrompts += PermissionCard(prompt.optString("id"), form.optString("tool", "Ação do Claude"), form.optJSONObject("input") ?: JSONObject())
+                val parsedPrompt = PermissionCard(prompt.optString("id"), form.optString("tool", "Ação do Claude"), form.optJSONObject("input") ?: JSONObject(), prompt.optString("kind", "permission"))
+                if (parsedPrompt.kind == "device_tool") dispatchDeviceTool(id, parsedPrompt) else parsedPrompts += parsedPrompt
             }
             val parsedRuns = mutableMapOf<String, ChatRun>()
             for (historyPage in pages.asReversed()) {

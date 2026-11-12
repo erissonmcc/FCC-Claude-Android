@@ -56,6 +56,7 @@ class FccChatModule(private val context: ReactApplicationContext) :
             putExtra("fcc_effort", effort)
             putExtra("fcc_backend_url", backendUrl)
             putExtra("fcc_backend_token", backendToken)
+            putExtra("fcc_local_workspace", ChatRepository.localWorkspace(context))
         })
         promise.resolve(null)
     }
@@ -63,6 +64,22 @@ class FccChatModule(private val context: ReactApplicationContext) :
     @ReactMethod
     fun finishSettings() {
         context.currentActivity?.takeIf { it is SettingsActivity }?.finish()
+    }
+
+    @ReactMethod
+    fun openFileAccessSettings(promise: Promise) {
+        try {
+            val intent = Intent(android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
+                data = android.net.Uri.parse("package:${context.packageName}")
+            }
+            context.currentActivity?.startActivity(intent) ?: context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            promise.resolve(null)
+        } catch (failure: Exception) { promise.reject("FCC_FILE_ACCESS", failure) }
+    }
+
+    @ReactMethod
+    fun hasFileAccess(promise: Promise) {
+        promise.resolve(android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.R || android.os.Environment.isExternalStorageManager())
     }
 
     @ReactMethod
@@ -86,6 +103,12 @@ class FccChatModule(private val context: ReactApplicationContext) :
         }
         ChatRepository.configure(context, normalized, token)
         promise.resolve(null)
+    }
+
+    @ReactMethod
+    fun configureLocalWorkspace(path: String, promise: Promise) {
+        try { ChatRepository.configureLocalWorkspace(context, path); promise.resolve(null) }
+        catch (failure: Exception) { promise.reject("FCC_LOCAL_WORKSPACE", failure) }
     }
 
     private fun currentModel(): ChatViewModel {
