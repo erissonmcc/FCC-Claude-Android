@@ -8,8 +8,8 @@ import {stylesheet} from './styles';
 type ApprovalMode = 'ask' | 'auto_review' | 'full_access';
 const options: {id: ApprovalMode; title: string; description: string; icon: string}[] = [
   {id: 'ask', title: 'Solicitar aprovação', description: 'Sempre pedir aprovação para editar arquivos externos e usar a internet', icon: 'ic_approval_hand'},
-  {id: 'auto_review', title: 'Aprovar por mim', description: 'Solicitar aprovação apenas para ações detectadas como potencialmente inseguras', icon: 'ic_approval_auto'},
-  {id: 'full_access', title: 'Acesso completo', description: 'Acesso irrestrito à internet e a qualquer arquivo no seu computador', icon: 'ic_approval_shield'},
+  {id: 'auto_review', title: 'Aprovar por mim', description: 'O Claude avalia cada ação, aprova as seguras e bloqueia as suspeitas', icon: 'ic_approval_auto'},
+  {id: 'full_access', title: 'Acesso completo', description: 'Aprova ferramentas sem pedir confirmação, salvo regras e ações críticas', icon: 'ic_approval_shield'},
 ];
 
 export function ApprovalMenu({mode, onSelectMode}: {mode: string; onSelectMode: (mode: ApprovalMode) => void}) {
