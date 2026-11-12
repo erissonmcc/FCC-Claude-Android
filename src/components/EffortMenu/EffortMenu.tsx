@@ -1,7 +1,7 @@
 import React, {useEffect, useRef, useState} from 'react';
 import {Animated, AppState, BackHandler, Image, Keyboard, PanResponder, ScrollView, StyleSheet, Text, View} from 'react-native';
 import {Portal} from '@gorhom/portal';
-import Reanimated, {useAnimatedStyle, useSharedValue, withTiming} from 'react-native-reanimated';
+import Reanimated, {runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming} from 'react-native-reanimated';
 import {useStyles} from 'react-native-unistyles';
 import {Pressable} from '../Pressable/Pressable';
 import {stylesheet} from './styles';
@@ -90,7 +90,7 @@ export function EffortMenu({
   const positionMenu = (onPositioned?: () => void) => {
     overlayRef.current?.measureInWindow((overlayX, overlayY, overlayWidth, overlayHeight) => {
       triggerRef.current?.measureInWindow((x, y, width) => {
-        const panelWidth = Math.min(360, overlayWidth - 32);
+        const panelWidth = Math.min(320, overlayWidth - 32);
         setPosition({
           width: panelWidth,
           left: Math.max(16, Math.min(x + width - overlayX - panelWidth, overlayWidth - panelWidth - 16)),
@@ -209,10 +209,7 @@ export function EffortMenu({
                       key={`${modelId}-${selectedEffort}`}
                       values={values}
                       selected={selectedEffort}
-                      onSelect={value => {
-                        onSelectEffort(value);
-                        setVisible(false);
-                      }}
+                      onSelect={onSelectEffort}
                     />
                   )}
                 </>
@@ -291,26 +288,28 @@ function EffortSlider({values, selected, onSelect}: {values: string[]; selected:
   const width = useRef(0);
   const pageXOffset = useRef(0);
   const currentProgress = useRef(initialIndex / Math.max(1, values.length - 1));
-  const progress = useRef(new Animated.Value(currentProgress.current)).current;
+  const progress = useSharedValue(currentProgress.current);
   const latest = useRef({values, onSelect});
   latest.current = {values, onSelect};
   const inset = 24;
 
+  const fillStyle = useAnimatedStyle(() => ({width: inset + Math.max(0, layoutWidth - inset * 2) * progress.value}));
+  const thumbStyle = useAnimatedStyle(() => ({left: inset + Math.max(0, layoutWidth - inset * 2) * progress.value - 14}));
+
   const updateFromPageX = (pageX: number) => {
     const x = pageX - pageXOffset.current;
-    const count = latest.current.values.length;
     const trackWidth = Math.max(1, width.current - inset * 2);
     const nextProgress = Math.max(0, Math.min(1, (x - inset) / trackWidth));
     currentProgress.current = nextProgress;
-    progress.setValue(nextProgress);
-    setPreview(Math.round(nextProgress * Math.max(0, count - 1)));
+    progress.value = nextProgress;
   };
+
+  const selectIndex = (index: number) => latest.current.onSelect(latest.current.values[index]);
 
   const responder = useRef(PanResponder.create({
     onStartShouldSetPanResponder: () => true,
     onMoveShouldSetPanResponder: () => true,
     onPanResponderGrant: event => {
-      progress.stopAnimation();
       sliderRef.current?.measureInWindow(x => {
         pageXOffset.current = x;
         updateFromPageX(event.nativeEvent.pageX);
@@ -322,22 +321,13 @@ function EffortSlider({values, selected, onSelect}: {values: string[]; selected:
       const nearestIndex = Math.round(currentProgress.current * Math.max(0, count - 1));
       const snappedProgress = nearestIndex / Math.max(1, count - 1);
       currentProgress.current = snappedProgress;
-      Animated.spring(progress, {
-        toValue: snappedProgress,
-        stiffness: 220,
-        damping: 22,
-        mass: 0.7,
-        useNativeDriver: false,
-      }).start(({finished}) => {
-        if (finished) latest.current.onSelect(latest.current.values[nearestIndex]);
+      setPreview(nearestIndex);
+      progress.value = withSpring(snappedProgress, {stiffness: 220, damping: 22}, finished => {
+        if (finished) runOnJS(selectIndex)(nearestIndex);
       });
     },
     onPanResponderTerminationRequest: () => false,
   })).current;
-
-  const range = Math.max(0, layoutWidth - inset * 2);
-  const fillWidth = progress.interpolate({inputRange: [0, 1], outputRange: [inset, inset + range]});
-  const thumbLeft = progress.interpolate({inputRange: [0, 1], outputRange: [inset - 16, inset + range - 16]});
 
   return (
     <View>
@@ -362,11 +352,11 @@ function EffortSlider({values, selected, onSelect}: {values: string[]; selected:
         style={s.slider}
       >
         <View pointerEvents="none" style={s.track} />
-        <Animated.View pointerEvents="none" style={[s.fill, {width: fillWidth}]} />
+        <Reanimated.View pointerEvents="none" style={[s.fill, fillStyle]} />
         <View pointerEvents="none" style={[s.steps, {left: inset, right: inset}]}>
           {values.map(value => <View key={value} style={s.dot} />)}
         </View>
-        <Animated.View pointerEvents="none" style={[s.thumb, {left: thumbLeft}]} />
+        <Reanimated.View pointerEvents="none" style={[s.thumb, thumbStyle]} />
       </View>
     </View>
   );
