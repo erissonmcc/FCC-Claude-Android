@@ -26,8 +26,8 @@ class MainActivity : ReactActivity() {
         DefaultReactActivityDelegate(this, mainComponentName, BuildConfig.IS_NEW_ARCHITECTURE_ENABLED)
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, false)
+        super.onCreate(savedInstanceState)
         window.statusBarColor = Color.TRANSPARENT
         window.navigationBarColor = Color.BLACK
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
