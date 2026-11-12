@@ -3,8 +3,8 @@ import {createStyleSheet} from 'react-native-unistyles';
 
 export const stylesheet = createStyleSheet(theme => ({
   anchor: {marginRight: theme.spacing.xs},
-  trigger: {width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.colors.effortSurfaceRaised, overflow: 'hidden'},
-  icon: {width: 21, height: 21, tintColor: theme.colors.muted},
+  trigger: {width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', overflow: 'hidden'},
+  icon: {width: 24, height: 24, tintColor: theme.colors.muted},
   overlay: {...StyleSheet.absoluteFillObject, zIndex: 100, elevation: 20},
   panelFade: {position: 'absolute', height: 340, elevation: 12},
   panel: {width: '100%', height: '100%', overflow: 'hidden', backgroundColor: theme.colors.effortSurface, borderRadius: 26, borderWidth: 1, borderColor: '#FFFFFF24'},

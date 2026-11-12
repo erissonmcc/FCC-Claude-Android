@@ -6,10 +6,10 @@ import {Pressable} from '../Pressable/Pressable';
 import {stylesheet} from './styles';
 
 type ApprovalMode = 'ask' | 'auto_review' | 'full_access';
-const options: {id: ApprovalMode; title: string; description: string; icon: string}[] = [
-  {id: 'ask', title: 'Solicitar aprovação', description: 'Sempre pedir aprovação para editar arquivos externos e usar a internet', icon: 'ic_approval_hand'},
-  {id: 'auto_review', title: 'Aprovar por mim', description: 'O Claude avalia cada ação, aprova as seguras e bloqueia as suspeitas', icon: 'ic_approval_auto'},
-  {id: 'full_access', title: 'Acesso completo', description: 'Aprova ferramentas sem pedir confirmação, salvo regras e ações críticas', icon: 'ic_approval_shield'},
+const options: {id: ApprovalMode; title: string; description: string; icon: number}[] = [
+  {id: 'ask', title: 'Solicitar aprovação', description: 'Sempre pedir aprovação para editar arquivos externos e usar a internet', icon: require('../../assets/lucide/hand.png')},
+  {id: 'auto_review', title: 'Aprovar por mim', description: 'O Claude avalia cada ação, aprova as seguras e bloqueia as suspeitas', icon: require('../../assets/lucide/badge_check.png')},
+  {id: 'full_access', title: 'Acesso completo', description: 'Aprova ferramentas sem pedir confirmação, salvo regras e ações críticas', icon: require('../../assets/lucide/shield.png')},
 ];
 
 export function ApprovalMenu({mode, onSelectMode}: {mode: string; onSelectMode: (mode: ApprovalMode) => void}) {
@@ -76,7 +76,7 @@ export function ApprovalMenu({mode, onSelectMode}: {mode: string; onSelectMode: 
   return <>
     <View ref={triggerRef} collapsable={false} style={s.anchor} onLayout={() => {if (visible) positionMenu();}}>
       <Pressable accessibilityRole="button" accessibilityLabel="Como as ações devem ser aprovadas?" accessibilityState={{expanded: visible}} onPress={open} style={s.trigger}>
-        <Image source={{uri: 'ic_approval_hand'}} style={s.icon} />
+        <Image source={require('../../assets/lucide/hand.png')} style={s.icon} />
       </Pressable>
     </View>
     {mounted && <Portal>
@@ -95,7 +95,7 @@ export function ApprovalMenu({mode, onSelectMode}: {mode: string; onSelectMode: 
                 {options.map(option => {
                   const selected = selectedMode === option.id;
                   return <Pressable key={option.id} accessibilityRole="button" accessibilityState={{selected}} onPress={() => {onSelectMode(option.id); setVisible(false);}} style={s.option}>
-                    <View style={s.optionIconWrap}><Image source={{uri: option.icon}} style={[s.optionIcon, option.id === 'full_access' && s.warningIcon]} /></View>
+                    <View style={s.optionIconWrap}><Image source={option.icon} style={[s.optionIcon, option.id === 'full_access' && s.warningIcon]} /></View>
                     <View style={s.optionCopy}>
                       <Text style={[s.optionTitle, option.id === 'full_access' && s.warning]}>{option.title}</Text>
                       <Text style={[s.optionDescription, option.id === 'full_access' && s.warning]}>{option.description}</Text>
