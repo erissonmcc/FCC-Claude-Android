@@ -3,7 +3,7 @@ import {createStyleSheet} from 'react-native-unistyles';
 export const stylesheet = createStyleSheet(theme => ({
   screen: {flex: 1, backgroundColor: theme.colors.backdrop},
   header: {flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 12, gap: 18, backgroundColor: theme.colors.backdrop, zIndex: 1, elevation: 8, shadowColor: '#000000', shadowOpacity: 0.35, shadowRadius: 8, shadowOffset: {width: 0, height: 4}},
-  back: {width: 44, height: 44, borderRadius: 22, backgroundColor: theme.colors.raised, alignItems: 'center', justifyContent: 'center'},
+  back: {width: 44, height: 44, borderRadius: 22, backgroundColor: theme.colors.raised, borderWidth: 1, borderColor: '#4A4A4A', alignItems: 'center', justifyContent: 'center'},
   backIcon: {width: 24, height: 24, tintColor: theme.colors.text, alignSelf: 'center'},
   content: {paddingHorizontal: 20, paddingBottom: 36, gap: theme.spacing.sm},
   title: {color: theme.colors.text, fontSize: 23, fontWeight: '700'},
