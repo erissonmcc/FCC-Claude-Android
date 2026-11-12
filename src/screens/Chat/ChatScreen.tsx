@@ -501,7 +501,7 @@ export default function ChatScreen({cwd: initialCwd, model: initialModel, mode: 
   >
   <SafeAreaView edges={['bottom', 'left', 'right']} style={styles.screen}>
     <StatusBar backgroundColor="transparent" barStyle="light-content" translucent />
-    {!ready || !state.connected ? <View style={styles.loading}><Image source={splashIcon} style={styles.loadingIcon} resizeMode="contain" />{ready && state.error ? <Text style={styles.loadingError}>{state.error}</Text> : null}</View> : <>
+    {!ready || !state.connected ? <View style={styles.loading}><Image source={splashIcon} style={styles.loadingIcon} resizeMode="contain" /></View> : <>
       <View style={styles.transcript} {...drawerSwipe.panHandlers}>
       <KeyboardAwareLegendList
         ref={listRef}
