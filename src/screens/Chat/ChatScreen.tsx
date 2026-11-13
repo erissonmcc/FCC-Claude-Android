@@ -242,6 +242,9 @@ export default function ChatScreen({cwd: initialCwd, model: initialModel, mode: 
   const scrollIdleTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const listDragging = React.useRef(false);
   const [composerHeight, setComposerHeight] = useState(112);
+  const [listViewportHeight, setListViewportHeight] = useState(0);
+  const [listContentHeight, setListContentHeight] = useState(0);
+  const listHasScroll = listViewportHeight > 0 && listContentHeight > listViewportHeight - composerHeight - 24 + 1;
   const keyboardAnimation = useReanimatedKeyboardAnimation();
   const keyboardOpenedOffset = Math.max(0, insets.bottom - 10);
   const emptyOverlayStyle = useAnimatedStyle(() => ({
@@ -442,10 +445,10 @@ export default function ChatScreen({cwd: initialCwd, model: initialModel, mode: 
   }, []);
   const anchorIndex = rows.findIndex(item => item.id === anchorId);
   useEffect(() => {
-    if (!state.busy || anchorDisabledByUser.current || (!isNearBottom.current && anchorId === null)) return;
+    if (!listHasScroll || !state.busy || anchorDisabledByUser.current || (!isNearBottom.current && anchorId === null)) return;
     const latestUser = [...rows].reverse().find(item => item.kind === 'user');
     if (latestUser && anchorId !== latestUser.id) setAnchorId(latestUser.id);
-  }, [anchorId, rows, state.busy]);
+  }, [anchorId, listHasScroll, rows, state.busy]);
   const renderAssistantMessage = useCallback((item: Item, inWork = false) => {
     if (!item.text) return null;
     return <View style={inWork ? styles.workAssistantRow : styles.assistantRow}>
@@ -521,7 +524,9 @@ export default function ChatScreen({cwd: initialCwd, model: initialModel, mode: 
         data={rows}
         keyExtractor={item => item.id}
         renderItem={renderItem}
-        anchoredEndSpace={anchorIndex >= 0 ? {anchorIndex, anchorOffset: insets.top + 80} : undefined}
+        anchoredEndSpace={listHasScroll && anchorIndex >= 0 ? {anchorIndex, anchorOffset: insets.top + 80} : undefined}
+        onLayout={event => setListViewportHeight(event.nativeEvent.layout.height)}
+        onContentSizeChange={(_width, height) => setListContentHeight(height)}
         alignItemsAtEnd
         contentInsetEndAdjustment={contentInsetEndAdjustment}
         freeze={freeze}
