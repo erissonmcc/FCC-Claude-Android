@@ -12,6 +12,8 @@ internal class DeviceToolExecutor(
         DeviceToolResult("A execução de comandos precisa ser encaminhada ao Termux.", true)
     },
 ) {
+    private val termuxFileTools by lazy { TermuxFileToolExecutor(root, commandRunner) }
+
     fun execute(tool: String, input: JSONObject): DeviceToolResult = try {
         if (tool != "run_command" && !storageAccessGranted()) {
             error("Conceda ao FCC o acesso a todos os arquivos nas configurações do Android.")
@@ -24,18 +26,12 @@ internal class DeviceToolExecutor(
                 DeviceToolResult(file.readText(Charsets.UTF_8), false)
             }
             "write_file" -> {
-                val file = resolve(input.getString("path")); val content = input.getString("content")
-                require(content.toByteArray(Charsets.UTF_8).size <= MAX_BYTES) { "Conteúdo excede o limite de 512 KiB." }
-                file.parentFile?.mkdirs(); file.writeText(content, Charsets.UTF_8); DeviceToolResult("Arquivo salvo: ${file.relativeTo(root.canonicalFile).path}", false)
+                termuxFileTools.writeFile(input.getString("path"), input.getString("content"))
             }
             "edit_file" -> {
-                val file = resolve(input.getString("path")); require(file.isFile) { "Arquivo não encontrado." }
-                val original = file.readText(Charsets.UTF_8); val old = input.getString("old_string")
-                require(old.isNotEmpty() && original.contains(old)) { "Trecho a substituir não encontrado." }
-                require(original.indexOf(old) == original.lastIndexOf(old)) { "Trecho ambíguo; precisa ocorrer uma única vez." }
-                val updated = original.replace(old, input.getString("new_string"))
-                require(updated.toByteArray(Charsets.UTF_8).size <= MAX_BYTES) { "Arquivo excede o limite de 512 KiB." }
-                file.writeText(updated, Charsets.UTF_8); DeviceToolResult("Arquivo atualizado: ${file.relativeTo(root.canonicalFile).path}", false)
+                termuxFileTools.editFile(
+                    input.getString("path"), input.getString("old_string"), input.getString("new_string"),
+                )
             }
             "list_directory" -> {
                 val dir = resolve(input.optString("path", ".")); require(dir.isDirectory) { "Diretório não encontrado." }
