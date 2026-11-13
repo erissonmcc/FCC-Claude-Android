@@ -134,7 +134,7 @@ internal object ChatRepository {
         val connection = (java.net.URL(baseUrl + path).openConnection() as java.net.HttpURLConnection)
         connection.requestMethod = method
         connection.connectTimeout = 3000
-        connection.readTimeout = 10000
+        connection.readTimeout = 30000
         connection.setRequestProperty("Accept", "application/json")
         authorize(connection)
         if (body != null) {
