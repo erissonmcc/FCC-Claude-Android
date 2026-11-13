@@ -12,6 +12,15 @@ const accordionExiting = FadeOut.duration(100);
 export type ToolItem = {id: string; kind: string; title: string; text: string; runId: string; complete?: boolean};
 export type Run = {status: string; createdAt: number; finishedAt: number | null; consumedTokens?: number | null};
 const actions: Record<string, string> = {"Skill": "Carregar skill", "Bash": "Executar comando", "BashOutput": "Acompanhar comando", "Read": "Ler arquivo", "FileRead": "Ler arquivo", "Write": "Gravar arquivo", "FileWrite": "Gravar arquivo", "Edit": "Editar arquivo", "FileEdit": "Editar arquivo", "MultiEdit": "Editar arquivos", "Glob": "Buscar arquivos", "Grep": "Buscar no conteúdo", "LS": "Listar arquivos", "NotebookEdit": "Editar notebook", "WebSearch": "Pesquisar na web", "WebFetch": "Abrir página", "Agent": "Executar agente", "Task": "Executar agente", "TaskOutput": "Acompanhar tarefa", "TaskCreate": "Criar tarefa", "TaskUpdate": "Atualizar tarefa", "TaskGet": "Consultar tarefa", "TaskList": "Listar tarefas", "TaskStop": "Parar tarefa", "KillShell": "Parar comando", "TodoWrite": "Atualizar lista de tarefas", "EnterPlanMode": "Entrar no modo de planejamento", "ExitPlanMode": "Concluir planejamento", "EnterWorktree": "Abrir área de trabalho isolada", "ExitWorktree": "Sair da área de trabalho isolada", "ToolSearch": "Buscar ferramentas", "ListMcpResources": "Listar recursos MCP", "ListMcpResourcesTool": "Listar recursos MCP", "ReadMcpResource": "Ler recurso MCP", "ReadMcpResourceTool": "Ler recurso MCP", "ReadMcpResourceDir": "Listar pasta MCP", "RefreshMcpTools": "Atualizar ferramentas MCP", "SendMessage": "Enviar mensagem ao agente", "TeamCreate": "Criar equipe", "TeamDelete": "Encerrar equipe", "CronCreate": "Agendar tarefa", "CronDelete": "Remover agendamento", "CronList": "Listar agendamentos", "ScheduleWakeup": "Programar retomada", "RemoteTrigger": "Gerenciar acionamento remoto", "Workflow": "Executar fluxo de trabalho", "Monitor": "Monitorar execução", "Artifact": "Gerenciar artefato", "Projects": "Gerenciar arquivos do projeto", "ClaudeDesign": "Executar ação de design", "ReportFindings": "Registrar resultados da revisão", "ProposeSkills": "Propor skills", "ProposeGoal": "Definir objetivo", "PushNotification": "Enviar notificação", "ReadNotifications": "Ler notificações", "SendFeedback": "Enviar feedback", "OfferChromeSetup": "Configurar navegador", "ShowOnboardingRolePicker": "Escolher perfil", "AskUserQuestion": "Fazer uma pergunta"};
+const phoneToolNames: Record<string, string> = {
+  'mcp__phone__read_file': 'Read',
+  'mcp__phone__write_file': 'Write',
+  'mcp__phone__edit_file': 'Edit',
+  'mcp__phone__list_directory': 'LS',
+  'mcp__phone__find_files': 'Glob',
+  'mcp__phone__search_files': 'Grep',
+  'mcp__phone__run_command': 'Bash',
+};
 const labels: Record<string, string> = {"skill": "Skill", "args": "Argumentos", "arguments": "Argumentos", "command": "Comando", "file_path": "Arquivo", "notebook_path": "Notebook", "path": "Pasta", "paths": "Pastas", "pattern": "Padrão", "glob": "Arquivos", "query": "Busca", "url": "Endereço", "description": "Descrição", "prompt": "Instruções", "content": "Conteúdo", "old_string": "Antes", "new_string": "Depois", "new_source": "Novo conteúdo", "edits": "Alterações", "replace_all": "Substituir todas as ocorrências", "offset": "Início", "limit": "Limite", "pages": "Páginas", "cell_id": "Célula", "cell_type": "Tipo de célula", "edit_mode": "Operação", "output_mode": "Formato da busca", "head_limit": "Limite de resultados", "multiline": "Várias linhas", "timeout": "Tempo limite (ms)", "timeout_ms": "Tempo limite (ms)", "run_in_background": "Em segundo plano", "server": "Servidor", "uri": "Recurso", "tool": "Ferramenta", "name": "Nome", "task_id": "Tarefa", "taskId": "Tarefa", "shell_id": "Comando", "agent_id": "Agente", "subagent_type": "Tipo de agente", "team_name": "Equipe", "recipient": "Destinatário", "subject": "Tarefa", "status": "Estado", "todos": "Tarefas", "activeForm": "Em andamento", "owner": "Responsável", "model": "Modelo", "effort": "Esforço", "mode": "Modo", "action": "Ação", "operation": "Operação", "allowed_domains": "Domínios permitidos", "blocked_domains": "Domínios excluídos", "cron": "Agendamento", "recurring": "Recorrente", "durable": "Persistente", "delaySeconds": "Espera (segundos)", "reason": "Motivo", "plan": "Plano", "allowedPrompts": "Ações previstas", "metadata": "Informações adicionais", "addBlocks": "Bloqueia", "addBlockedBy": "Depende de", "findings": "Resultados"};
 const primary = ['skill','args','command','file_path','notebook_path','path','pattern','glob','query','url','subject','name','task_id','taskId','status','server','uri','recipient','subagent_type','action','operation','cron','reason'];
 const codeFields = new Set(['command','content','old_string','new_string','new_source','script','diff','skillMd']);
@@ -22,7 +31,9 @@ const icons = {
   chevron_right: require('../../assets/lucide/chevron_right.png'),
 };
 function Icon({name}: {name: keyof typeof icons}) {const {styles: s} = useStyles(stylesheet); return <Image source={icons[name]} style={s.icon} />;}
+function displayToolName(name: string) {return phoneToolNames[name] || name;}
 function category(tool: string) {
+  tool = displayToolName(tool);
   if (['Bash','BashOutput','KillShell'].includes(tool)) return 'comandos';
   if (['Read','FileRead','Write','FileWrite','Edit','FileEdit','MultiEdit','NotebookEdit'].includes(tool)) return 'arquivos';
   if (['Glob','Grep','LS'].includes(tool)) return 'buscas';
@@ -30,7 +41,7 @@ function category(tool: string) {
   return 'ferramentas';
 }
 function groupIcon(items: ToolItem[]): keyof typeof icons {
-  if (items.every(item => item.title.startsWith('mcp__'))) return 'plug';
+  if (items.every(item => item.title.startsWith('mcp__') && displayToolName(item.title) === item.title)) return 'plug';
   const kinds = [...new Set(items.map(item => category(item.title)))];
   if (kinds.length !== 1) return 'zap';
   return kinds[0] === 'comandos' ? 'terminal' : kinds[0] === 'arquivos' ? 'file' : ['buscas','web'].includes(kinds[0]) ? 'search' : 'zap';
@@ -62,7 +73,8 @@ export function ToolActivity({item}: {item: ToolItem}) {
   const keys = Object.keys(input).filter(key => input[key] != null);
   const summaryKey = primary.find(key => keys.includes(key) && typeof input[key] !== 'object') || keys.find(key => key !== 'description' && typeof input[key] !== 'object');
   const summary = input.description || (summaryKey ? input[summaryKey] : '');
-  const title = actions[item.title] || titleCase(item.title.split('__').pop()!.replace(/_/g, ' '));
+  const toolName = displayToolName(item.title);
+  const title = actions[toolName] || titleCase(toolName.split('__').pop()!.replace(/_/g, ' '));
   return <AnimatedAccordion.Accordion isOpen={expanded} onChange={setExpanded} layout={accordionLayout}>
     <AnimatedAccordion.Header>
       <View accessible accessibilityRole="button" accessibilityState={{expanded}} style={s.toolHeader}>
@@ -73,7 +85,7 @@ export function ToolActivity({item}: {item: ToolItem}) {
     </AnimatedAccordion.Header>
     <AnimatedAccordion.Expanded layout={accordionLayout} entering={accordionEntering} exiting={accordionExiting}>
       <View style={s.details}>
-        <Text style={s.label}>{item.title}</Text>
+        <Text style={s.label}>{toolName}</Text>
         {input.description != null && <Text style={s.summary}>{String(input.description)}</Text>}
         {keys.filter(key => key !== 'description').map(key => <Field key={key} name={key} value={input[key]}/>)}
       </View>
@@ -88,8 +100,9 @@ function ToolGroup({items, active}: {items: ToolItem[]; active: boolean}) {
   const summaries: Record<string,string> = {comandos:'executou comandos',arquivos:'acessou arquivos',buscas:'fez buscas',web:'acessou a web',ferramentas:'usou ferramentas'};
   const input = parse(latest.text);
   const path = String(input.file_path || input.path || '').split('/').pop();
-  const verb = ['Read','FileRead'].includes(latest.title) ? 'Lendo' : ['Write','FileWrite'].includes(latest.title) ? 'Gravando' : ['Edit','FileEdit','MultiEdit','NotebookEdit'].includes(latest.title) ? 'Editando' : '';
-  const activeLabel = verb ? `${verb} ${path || 'arquivo'}` : latest.title === 'Bash' ? String(input.description || 'Executando comando') : latest.title === 'WebSearch' ? 'Pesquisando na web' : latest.title === 'WebFetch' ? 'Abrindo página' : actions[latest.title] || 'Usando ferramenta';
+  const latestTool = displayToolName(latest.title);
+  const verb = ['Read','FileRead'].includes(latestTool) ? 'Lendo' : ['Write','FileWrite'].includes(latestTool) ? 'Gravando' : ['Edit','FileEdit','MultiEdit','NotebookEdit'].includes(latestTool) ? 'Editando' : '';
+  const activeLabel = verb ? `${verb} ${path || 'arquivo'}` : latestTool === 'Bash' ? String(input.description || 'Executando comando') : latestTool === 'WebSearch' ? 'Pesquisando na web' : latestTool === 'WebFetch' ? 'Abrindo página' : actions[latestTool] || 'Usando ferramenta';
   return <AnimatedAccordion.Accordion isOpen={expanded} onChange={setExpanded} layout={accordionLayout}>
     <AnimatedAccordion.Header>
       <View accessible accessibilityRole="button" accessibilityState={{expanded}} style={s.groupHeader}>
