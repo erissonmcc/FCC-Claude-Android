@@ -47,6 +47,8 @@ internal object ChatRepository {
     suspend fun post(path: String, body: JSONObject): JSONObject = request("POST", path, body)
 
     suspend fun uploadAttachment(sessionId: String, uri: Uri, name: String, contentType: String, contentResolver: android.content.ContentResolver): JSONObject = withContext(Dispatchers.IO) {
+        val started = System.nanoTime()
+        var responseStatus: Int? = null
         val boundary = "fcc-${UUID.randomUUID()}"
         val connection = (java.net.URL("$baseUrl/admin/api/code/sessions/$sessionId/attachments").openConnection() as java.net.HttpURLConnection)
         connection.requestMethod = "POST"
@@ -67,10 +69,17 @@ internal object ChatRepository {
                 output.write("\r\n--$boundary--\r\n".toByteArray(Charsets.UTF_8))
             }
             val status = connection.responseCode
+            responseStatus = status
             val stream = if (status in 200..299) connection.inputStream else connection.errorStream
-            val raw = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
+            val raw = stream?.bufferedReader()?.use { if (status in 200..299) it.readText() else readErrorBody(it) }.orEmpty()
             if (status !in 200..299) throw IllegalStateException("FCC ($status): ${runCatching { JSONObject(raw).optString("detail", raw) }.getOrDefault(raw)}")
             JSONObject(raw)
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            val elapsed = (System.nanoTime() - started) / 1_000_000
+            val endpoint = requestErrorEndpoint(baseUrl, "/admin/api/code/sessions/$sessionId/attachments")
+            throw IOException(formatDiagnosticError("POST $endpoint", failure, "HTTP: ${responseStatus ?: "sem resposta"}; duração: $elapsed ms"), failure)
         } finally { connection.disconnect() }
     }
 
@@ -133,23 +142,35 @@ internal object ChatRepository {
     }
 
     private suspend fun request(method: String, path: String, body: JSONObject?): JSONObject = withContext(Dispatchers.IO) {
-        val connection = (java.net.URL(baseUrl + path).openConnection() as java.net.HttpURLConnection)
-        connection.requestMethod = method
-        connection.connectTimeout = 3000
-        connection.readTimeout = 30000
-        connection.setRequestProperty("Accept", "application/json")
-        authorize(connection)
-        if (body != null) {
-            connection.doOutput = true
-            connection.setRequestProperty("Content-Type", "application/json; charset=utf-8")
-            connection.outputStream.use { it.write(body.toString().toByteArray(Charsets.UTF_8)) }
-        }
+        val started = System.nanoTime()
+        val endpoint = requestErrorEndpoint(baseUrl, path)
+        var connection: java.net.HttpURLConnection? = null
+        var status: Int? = null
         try {
-            val status = connection.responseCode
-            val stream = if (status in 200..299) connection.inputStream else connection.errorStream
-            val raw = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
-            if (status !in 200..299) throw IllegalStateException("FCC ($status): ${runCatching { JSONObject(raw).optString("detail", raw) }.getOrDefault(raw)}")
+            val request = (java.net.URL(baseUrl + path).openConnection() as java.net.HttpURLConnection)
+            connection = request
+            request.requestMethod = method
+            request.connectTimeout = 3000
+            request.readTimeout = 30000
+            request.setRequestProperty("Accept", "application/json")
+            authorize(request)
+            if (body != null) {
+                request.doOutput = true
+                request.setRequestProperty("Content-Type", "application/json; charset=utf-8")
+                request.outputStream.use { it.write(body.toString().toByteArray(Charsets.UTF_8)) }
+            }
+            val responseStatus = request.responseCode
+            status = responseStatus
+            val success = responseStatus in 200..299
+            val stream = if (success) request.inputStream else request.errorStream
+            val raw = stream?.bufferedReader()?.use { if (success) it.readText() else readErrorBody(it) }.orEmpty()
+            if (!success) throw IllegalStateException("FCC ($responseStatus): ${runCatching { JSONObject(raw).optString("detail", raw) }.getOrDefault(raw)}")
             JSONObject(raw)
-        } finally { connection.disconnect() }
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            val elapsed = (System.nanoTime() - started) / 1_000_000
+            throw IOException(formatDiagnosticError("$method $endpoint", failure, "HTTP: ${status ?: "sem resposta"}; duração: $elapsed ms"), failure)
+        } finally { connection?.disconnect() }
     }
 }

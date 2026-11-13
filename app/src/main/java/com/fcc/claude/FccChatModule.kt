@@ -2,6 +2,10 @@ package com.fcc.claude
 
 import android.app.Activity
 import android.content.Intent
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.widget.Toast
 import android.database.Cursor
 import android.provider.OpenableColumns
 import androidx.lifecycle.ViewModelProvider
@@ -37,6 +41,20 @@ class FccChatModule(private val context: ReactApplicationContext) :
     }
 
     override fun getName() = "FccChat"
+
+    @ReactMethod
+    fun copyError(report: String, promise: Promise) {
+        scope.launch {
+            try {
+                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                clipboard.setPrimaryClip(ClipData.newPlainText("Erro FCC", boundedErrorText(report)))
+                Toast.makeText(context, "Detalhes do erro copiados", Toast.LENGTH_SHORT).show()
+                promise.resolve(null)
+            } catch (failure: Exception) {
+                promise.reject("FCC_CLIPBOARD", formatDiagnosticError("Copiar erro", failure), failure)
+            }
+        }
+    }
 
     @ReactMethod
     fun openSettings(cwd: String, modelName: String, mode: String, effort: String, backendUrl: String, backendToken: String, promise: Promise) {
@@ -148,7 +166,7 @@ class FccChatModule(private val context: ReactApplicationContext) :
     }
 
     @ReactMethod
-    fun refresh(promise: Promise) = runWithModel(promise) { vm ->
+    fun refresh(promise: Promise) = runWithModel(promise, "Atualizar conexão") { vm ->
         val activity = context.currentActivity as? MainActivity
         vm.refresh(activity?.launchCwd ?: vm.session.value?.cwd ?: ChatRepository.defaultWorkingDirectory(), activity?.launchOptions ?: LaunchOptions(), null)
         null
@@ -160,43 +178,43 @@ class FccChatModule(private val context: ReactApplicationContext) :
     }
 
     @ReactMethod
-    fun sendMessage(text: String, clientMessageId: String, promise: Promise) = runWithModel(promise) { vm ->
+    fun sendMessage(text: String, clientMessageId: String, promise: Promise) = runWithModel(promise, "Enviar mensagem") { vm ->
         val cwd = vm.session.value?.cwd ?: (context.currentActivity as? MainActivity)?.launchCwd ?: ChatRepository.defaultWorkingDirectory()
         vm.sendMessage(text, null, cwd, vm.session.value?.reasoningEffort.orEmpty(), context.contentResolver, clientMessageId)
     }
 
     @ReactMethod
-    fun stop(promise: Promise) = runWithModel(promise) { it.stopActiveRun(); null }
+    fun stop(promise: Promise) = runWithModel(promise, "Interromper execução") { it.stopActiveRun(); null }
 
     @ReactMethod
     fun newSession(cwd: String, modelName: String, mode: String, effort: String, promise: Promise) =
-        runWithModel(promise) { vm -> vm.startSession(cwd, modelName.ifBlank { null }, mode, effort.ifBlank { null }); null }
+        runWithModel(promise, "Criar conversa") { vm -> vm.startSession(cwd, modelName.ifBlank { null }, mode, effort.ifBlank { null }); null }
 
     @ReactMethod
-    fun selectSession(id: String, promise: Promise) = runWithModel(promise) { vm ->
+    fun selectSession(id: String, promise: Promise) = runWithModel(promise, "Abrir conversa") { vm ->
         vm.sessions.firstOrNull { it.id == id }?.let { vm.selectSession(it) }
         null
     }
 
     @ReactMethod
-    fun deleteSession(id: String, promise: Promise) = runWithModel(promise) { vm ->
+    fun deleteSession(id: String, promise: Promise) = runWithModel(promise, "Excluir conversa") { vm ->
         vm.sessions.firstOrNull { it.id == id }?.let { vm.deleteSession(it) }
         null
     }
 
     @ReactMethod
     fun applySettings(cwd: String, modelName: String, mode: String, effort: String, promise: Promise) =
-        runWithModel(promise) { vm ->
+        runWithModel(promise, "Salvar configurações") { vm ->
             check(vm.applySettings(cwd, modelName, mode, effort)) { vm.error.value ?: "Não foi possível salvar as configurações" }
             stateJson(vm).toString()
         }
 
     @ReactMethod
-    fun chooseProjectFolder(path: String, promise: Promise) = runWithModel(promise) { it.chooseProjectFolder(path) }
+    fun chooseProjectFolder(path: String, promise: Promise) = runWithModel(promise, "Selecionar pasta") { it.chooseProjectFolder(path) }
 
     @ReactMethod
     fun respondPrompt(promptId: String, approved: Boolean, answersJson: String?, promise: Promise) =
-        runWithModel(promise) { vm ->
+        runWithModel(promise, "Responder solicitação") { vm ->
             vm.prompts.firstOrNull { it.id == promptId }?.let { prompt ->
                 val answers = answersJson?.takeIf(String::isNotBlank)?.let(::JSONObject)
                 vm.respondPrompt(prompt, approved, answers)
@@ -205,13 +223,13 @@ class FccChatModule(private val context: ReactApplicationContext) :
         }
 
     @ReactMethod
-    fun loadOlder(promise: Promise) = runWithModel(promise) { vm ->
+    fun loadOlder(promise: Promise) = runWithModel(promise, "Carregar histórico anterior") { vm ->
         vm.session.value?.id?.let { vm.loadDetail(it, older = true) }
         null
     }
 
     @ReactMethod
-    fun removeAttachment(key: String, promise: Promise) = runWithModel(promise) { vm ->
+    fun removeAttachment(key: String, promise: Promise) = runWithModel(promise, "Remover anexo") { vm ->
         vm.pendingAttachments.removeAll { it.key == key }
         null
     }
@@ -276,8 +294,8 @@ class FccChatModule(private val context: ReactApplicationContext) :
 
     private fun Cursor.getFirstColumnString(): String? = if (moveToFirst()) getString(0) else null
 
-    private fun runWithModel(promise: Promise, block: suspend (ChatViewModel) -> Any?) {
-        val vm = runCatching { currentModel() }.getOrElse { promise.reject("FCC_ACTION", it); return }
+    private fun runWithModel(promise: Promise, operation: String = "Executar ação do chat", block: suspend (ChatViewModel) -> Any?) {
+        val vm = runCatching { currentModel() }.getOrElse { promise.reject("FCC_ACTION", formatDiagnosticError(operation, it), it); return }
         scope.launch {
             try {
                 val result = block(vm)
@@ -286,7 +304,9 @@ class FccChatModule(private val context: ReactApplicationContext) :
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (failure: Exception) {
-                promise.reject("FCC_ACTION", failure)
+                val report = formatDiagnosticError(operation, failure)
+                vm.error.value = report
+                promise.reject("FCC_ACTION", report, failure)
             }
         }
     }
@@ -320,7 +340,8 @@ class FccChatModule(private val context: ReactApplicationContext) :
         .put("busy", vm.busy.value).put("sending", vm.sendingSessionId.value != null)
         .put("activeRunId", vm.activeRunId.value).put("connected", vm.connected.value)
         .put("feedConnected", vm.feedConnected.value).put("draft", vm.draft.value)
-        .put("error", vm.error.value ?: JSONObject.NULL).put("historyError", vm.historyError.value ?: JSONObject.NULL)
+        .put("error", vm.error.value?.let(::boundedErrorText) ?: JSONObject.NULL)
+        .put("historyError", vm.historyError.value?.let(::boundedErrorText) ?: JSONObject.NULL)
         .put("historyCursor", vm.historyCursor.value ?: JSONObject.NULL)
         .put("historyLoading", vm.historyLoading.value).put("detailLoaded", vm.detailLoadedForSession.value == vm.session.value?.id)
         .put("bootstrap", vm.bootstrap.value)

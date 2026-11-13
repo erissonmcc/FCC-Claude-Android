@@ -8,7 +8,7 @@ export const stylesheet = createStyleSheet(theme => ({
   transcript: {flex: 1}, latestButton: {width: 38, height: 38, borderRadius: 19, backgroundColor: theme.colors.raised, borderWidth: 1, borderColor: theme.colors.line, alignItems: 'center', justifyContent: 'center'}, latestText: {color: theme.colors.text, fontSize: 22},
   transcriptBottomFade: {position: 'absolute', left: 0, right: 0, bottom: 0},
   loading: {flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#000000'},
-  errorBanner: {position: 'absolute', left: 16, right: 16, zIndex: 10, paddingHorizontal: 14, paddingVertical: theme.spacing.sm, borderRadius: 12, backgroundColor: '#482F2B'}, errorText: {color: theme.colors.danger, fontSize: theme.typography.sm},
+  errorText: {color: theme.colors.danger, fontSize: theme.typography.sm},
   emptyOverlay: {position: 'absolute', left: 0, right: 0},
   emptyState: {flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: theme.spacing.xxl}, emptyTitle: {color: theme.colors.text, fontSize: theme.typography.title, fontWeight: '600', marginBottom: theme.spacing.sm},
   assistantRow: {width: '100%', paddingHorizontal: 18, paddingVertical: 2}, workAssistantRow: {width: '100%', paddingVertical: 2}, userRow: {maxWidth: '88%', alignSelf: 'flex-end', marginHorizontal: 18, marginTop: 14, marginBottom: theme.spacing.xxl}, userBubble: {backgroundColor: theme.colors.raised, borderRadius: 22, paddingHorizontal: 15, paddingVertical: 11}, userText: {color: theme.colors.text, fontSize: theme.typography.md, lineHeight: 22},

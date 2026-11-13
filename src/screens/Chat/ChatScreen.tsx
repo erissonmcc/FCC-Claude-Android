@@ -32,6 +32,8 @@ import { ContextMenu, ContextMenuDots } from '../../components/ContextMenu/Conte
 import { GeneratingIndicator} from '../../components/GeneratingIndicator/GeneratingIndicator';
 import { Pressable} from '../../components/Pressable/Pressable';
 import { WorkActivity, type Run} from '../../components/ToolActivity/ToolActivity';
+import {ErrorBanner} from '../../components/ErrorBanner/ErrorBanner';
+import {formatActionError} from '../../components/ErrorBanner/errorPresentation';
 import {hasFinalMessageAfterTools} from '../../components/ToolActivity/workActivityState';
 import { NativeEventEmitter, NativeModules} from 'react-native';
 import { colors as C} from '../../theme';
@@ -138,6 +140,7 @@ const FccChat = NativeModules.FccChat as {
   getBackendConfig(): Promise<string>;
   configureBackend(url: string, token: string): Promise<unknown>;
   refresh(): Promise<unknown>;
+  copyError(report: string): Promise<void>;
   setDraft(text: string): void;
   sendMessage(text: string, clientMessageId: string): Promise<boolean>;
   stop(): Promise<unknown>;
@@ -227,6 +230,9 @@ export default function ChatScreen({cwd: initialCwd, model: initialModel, mode: 
   const {styles} = useStyles(stylesheet);
   const [ready, setReady] = useState(false);
   const [state, setState] = useState<ChatState>(EMPTY);
+  const reportError = useCallback((operation: string, error: unknown) => {
+    setState(previous => ({...previous, error: formatActionError(operation, error)}));
+  }, []);
   const [optimisticMessages, setOptimisticMessages] = useState<OptimisticMessage[]>([]);
   const [localCwd, setLocalCwd] = useState(initialCwd);
   const [localModel, setLocalModel] = useState(initialModel);
@@ -374,7 +380,7 @@ export default function ChatScreen({cwd: initialCwd, model: initialModel, mode: 
       setLocalBackendToken(config.token);
     }).finally(() => FccChat.initialize()
       .then(snapshot => snapshotHandler.current(snapshot))
-      .catch(error => setState(prev => ({...prev, error: String(error)})))
+      .catch(error => reportError('Inicializar chat', error))
       .finally(() => setReady(true)));
   }, []);
 
@@ -406,9 +412,10 @@ export default function ChatScreen({cwd: initialCwd, model: initialModel, mode: 
       if (openSettings === true) onSettings();
     } catch (error) {
       setOptimisticMessages(previous => previous.filter(message => message.item.id !== clientMessageId));
+      reportError('Enviar mensagem', error);
       console.warn('Não foi possível enviar a mensagem', error);
     }
-  }, [onSettings, scrollMessageToEnd, state.draft, state.session?.id]);
+  }, [onSettings, reportError, scrollMessageToEnd, state.draft, state.session?.id]);
 
   const currentAttachments = state.attachments.filter(item => item.sessionId === state.session?.id);
 
@@ -628,7 +635,7 @@ export default function ChatScreen({cwd: initialCwd, model: initialModel, mode: 
           onSelectMode={value => {
             setLocalMode(value);
             syncConfig({cwd: localCwd, model: localModel, mode: value, effort: localEffort, backendUrl: localBackendUrl, backendToken: localBackendToken});
-            void FccChat.applySettings(localCwd, localModel, value, localEffort);
+            void FccChat.applySettings(localCwd, localModel, value, localEffort).catch(error => reportError('Salvar modo de permissão', error));
           }}
         />
         <EffortMenu
@@ -647,13 +654,13 @@ export default function ChatScreen({cwd: initialCwd, model: initialModel, mode: 
             }).catch(error => {
               if (pendingEffort.current?.request !== request) return;
               pendingEffort.current = null;
-              setState(previous => ({...previous, error: String(error)}));
+              reportError('Salvar esforço de raciocínio', error);
             });
           }}
           onSelectModel={newModel => {
             setLocalModel(newModel);
             syncConfig({cwd: localCwd, model: newModel, mode: localMode, effort: localEffort, backendUrl: localBackendUrl, backendToken: localBackendToken});
-            void FccChat.applySettings(localCwd, newModel, localMode, localEffort);
+            void FccChat.applySettings(localCwd, newModel, localMode, localEffort).catch(error => reportError('Selecionar modelo', error));
           }}
         />
         {state.busy && !state.draft.trim()
@@ -672,11 +679,13 @@ export default function ChatScreen({cwd: initialCwd, model: initialModel, mode: 
       scrollY={topBarScrollY}
       onOpenDrawer={() => drawerRef.current?.openDrawer()}
       onNewConversation={() => FccChat.newSession(localCwd, '', localMode, '')}
-      onRefresh={() => { void FccChat.refresh(); }}
+      onRefresh={() => { void FccChat.refresh().catch(error => reportError('Atualizar conexão', error)); }}
       onStop={() => FccChat.stop()}
       onSettings={onSettings}
     />
-    {!!state.error && <Pressable accessibilityRole="button" onPress={() => FccChat.refresh()} style={[styles.errorBanner, {top: insets.top + 80}]}><Text style={styles.errorText}>{state.error}</Text></Pressable>}
+    {!!state.error && <ErrorBanner message={state.error} top={insets.top + 80} onCopy={report => {
+      void FccChat.copyError(report).catch(error => console.warn('Não foi possível copiar o erro', error));
+    }} />}
 
   </SafeAreaView>
   </DrawerLayoutAndroid>;
