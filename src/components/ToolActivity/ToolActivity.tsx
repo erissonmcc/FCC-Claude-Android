@@ -1,7 +1,8 @@
 // Presentation and labels adapted from the original Compose ToolActivity.
 import React, {useEffect, useState} from 'react';
 import {Image, ScrollView, Text, View} from 'react-native';
-import Animated, {Easing, LinearTransition, useAnimatedStyle, useSharedValue, withTiming} from 'react-native-reanimated';
+import {Accordion as AnimatedAccordion} from '@animatereactnative/accordion';
+import Animated, {LinearTransition} from 'react-native-reanimated';
 import {useStyles} from 'react-native-unistyles';
 import {Pressable} from '../Pressable/Pressable';
 import {stylesheet} from './styles';
@@ -51,58 +52,6 @@ function Field({name, value}: {name: string; value: unknown}) {
 }
 function status(value: string) {return ({completed:'Concluída',in_progress:'Em andamento',pending:'Pendente',deleted:'Removida'} as Record<string,string>)[value] || value;}
 
-function Accordion({
-  expanded,
-  children,
-  duration = 240,
-}: {
-  expanded: boolean;
-  children: React.ReactNode;
-  duration?: number;
-}) {
-  const height = useSharedValue(0);
-  const measured = useSharedValue(0);
-
-  useEffect(() => {
-    if (measured.value > 0) {
-      height.value = withTiming(expanded ? measured.value : 0, {
-        duration,
-        easing: Easing.bezier(0.25, 0.1, 0.25, 1),
-      });
-    }
-  }, [expanded, duration]);
-
-  const animatedStyle = useAnimatedStyle(() => {
-    return {
-      height: measured.value === 0 ? (expanded ? undefined : 0) : height.value,
-      opacity: measured.value === 0 ? (expanded ? 1 : 0) : withTiming(expanded ? 1 : 0, {duration: duration * 0.75}),
-      overflow: 'hidden',
-    };
-  });
-
-  return (
-    <Animated.View style={animatedStyle}>
-      <View
-        collapsable={false}
-        onLayout={e => {
-          const h = e.nativeEvent.layout.height;
-          if (h > 0 && Math.abs(h - measured.value) > 1) {
-            const wasZero = measured.value === 0;
-            measured.value = h;
-            if (wasZero) {
-              height.value = expanded ? h : 0;
-            } else if (expanded) {
-              height.value = withTiming(h, {duration: 160});
-            }
-          }
-        }}
-      >
-        {children}
-      </View>
-    </Animated.View>
-  );
-}
-
 export function ToolActivity({item}: {item: ToolItem}) {
   const {styles: s} = useStyles(stylesheet);
   const [expanded, setExpanded] = useState(false);
@@ -111,20 +60,22 @@ export function ToolActivity({item}: {item: ToolItem}) {
   const summaryKey = primary.find(key => keys.includes(key) && typeof input[key] !== 'object') || keys.find(key => key !== 'description' && typeof input[key] !== 'object');
   const summary = input.description || (summaryKey ? input[summaryKey] : '');
   const title = actions[item.title] || titleCase(item.title.split('__').pop()!.replace(/_/g, ' '));
-  return <View>
-    <Pressable accessibilityRole="button" accessibilityState={{expanded}} onPress={() => setExpanded(!expanded)} style={s.toolHeader}>
-      <Icon name={groupIcon([item])}/>
-      <Text numberOfLines={1} style={s.summary}>{title}{!expanded && summary ? ': ' + String(summary).replace(/\s+/g,' ') : ''}</Text>
-      <Icon name={expanded ? 'chevron_down' : 'chevron_right'} />
-    </Pressable>
-    <Accordion expanded={expanded} duration={220}>
+  return <AnimatedAccordion.Accordion isOpen={expanded} onChange={setExpanded}>
+    <AnimatedAccordion.Header>
+      <View accessible accessibilityRole="button" accessibilityState={{expanded}} style={s.toolHeader}>
+        <Icon name={groupIcon([item])}/>
+        <Text numberOfLines={1} style={s.summary}>{title}{!expanded && summary ? ': ' + String(summary).replace(/\s+/g,' ') : ''}</Text>
+        <Icon name={expanded ? 'chevron_down' : 'chevron_right'} />
+      </View>
+    </AnimatedAccordion.Header>
+    <AnimatedAccordion.Expanded>
       <View style={s.details}>
         <Text style={s.label}>{item.title}</Text>
         {input.description != null && <Text style={s.summary}>{String(input.description)}</Text>}
         {keys.filter(key => key !== 'description').map(key => <Field key={key} name={key} value={input[key]}/>)}
       </View>
-    </Accordion>
-  </View>;
+    </AnimatedAccordion.Expanded>
+  </AnimatedAccordion.Accordion>;
 }
 function ToolGroup({items, active}: {items: ToolItem[]; active: boolean}) {
   const {styles: s} = useStyles(stylesheet);
@@ -136,51 +87,56 @@ function ToolGroup({items, active}: {items: ToolItem[]; active: boolean}) {
   const path = String(input.file_path || input.path || '').split('/').pop();
   const verb = ['Read','FileRead'].includes(latest.title) ? 'Lendo' : ['Write','FileWrite'].includes(latest.title) ? 'Gravando' : ['Edit','FileEdit','MultiEdit','NotebookEdit'].includes(latest.title) ? 'Editando' : '';
   const activeLabel = verb ? `${verb} ${path || 'arquivo'}` : latest.title === 'Bash' ? String(input.description || 'Executando comando') : latest.title === 'WebSearch' ? 'Pesquisando na web' : latest.title === 'WebFetch' ? 'Abrindo página' : actions[latest.title] || 'Usando ferramenta';
-  return <View>
-    <Pressable accessibilityRole="button" accessibilityState={{expanded}} android_ripple={null} onPress={() => setExpanded(value => !value)} style={s.groupHeader}>
-      <Icon name={groupIcon(active ? [latest] : items)}/>
-      <Text numberOfLines={1} style={s.summary}>{active ? activeLabel : titleCase(categories.map(kind => summaries[kind]).join(' e '))}</Text>
-      <Icon name={expanded ? 'chevron_down' : 'chevron_right'} />
-    </Pressable>
-    <Accordion expanded={expanded} duration={240}>
-      {items.map(item => <ToolActivity key={item.id} item={item}/>)}
-    </Accordion>
-  </View>;
+  return <AnimatedAccordion.Accordion isOpen={expanded} onChange={setExpanded}>
+    <AnimatedAccordion.Header>
+      <View accessible accessibilityRole="button" accessibilityState={{expanded}} style={s.groupHeader}>
+        <Icon name={groupIcon(active ? [latest] : items)}/>
+        <Text numberOfLines={1} style={s.summary}>{active ? activeLabel : titleCase(categories.map(kind => summaries[kind]).join(' e '))}</Text>
+        <Icon name={expanded ? 'chevron_down' : 'chevron_right'} />
+      </View>
+    </AnimatedAccordion.Header>
+    <AnimatedAccordion.Expanded>
+      {items.map(item => <AnimatedAccordion.Sibling key={item.id}><ToolActivity item={item}/></AnimatedAccordion.Sibling>)}
+    </AnimatedAccordion.Expanded>
+  </AnimatedAccordion.Accordion>;
 }
 export function WorkActivity({items, run, renderMessage}: {items: ToolItem[]; run?: Run; renderMessage: (item: ToolItem) => React.ReactNode}) {
   const {styles: s} = useStyles(stylesheet);
   const active = !!run && ['preparing','running','stopping'].includes(run.status);
   const [expanded, setExpanded] = useState(active);
-  useEffect(() => {if (!active) setExpanded(false);}, [active]);
-  const showContent = !run || active || expanded;
+  useEffect(() => {setExpanded(active);}, [active]);
   const seconds = run?.finishedAt && run.createdAt > 0 ? Math.max(0, Math.floor((run.finishedAt - run.createdAt)/1000)) : null;
   const duration = seconds == null ? '' : seconds >= 3600 ? `${Math.floor(seconds/3600)} h ${Math.floor(seconds%3600/60)} min ${seconds%60} s` : seconds >= 60 ? `${Math.floor(seconds/60)} min ${seconds%60} s` : `${seconds} s`;
   const parts: ToolItem[][] = [];
   for (const item of items) {const last=parts[parts.length-1]; if (item.kind === 'tool_call' && last?.[0].kind === 'tool_call') last.push(item); else parts.push([item]);}
-  return <View style={s.work}>
-    {run && !active && <Pressable accessibilityRole="button" accessibilityState={{expanded}} android_ripple={null} onPress={() => setExpanded(value => !value)} style={s.workHeader}>
-      <Text style={s.summary}>{duration ? `Trabalhou por ${duration}` : 'Trabalhou'}</Text>
-      <Icon name={expanded ? 'chevron_down' : 'chevron_right'}/>
-    </Pressable>}
-    <Accordion expanded={showContent} duration={260}>
+  return <AnimatedAccordion.Accordion key={!run ? 'static' : active ? 'active' : 'finished'} isOpen={!run || active} onChange={setExpanded} style={s.work}>
+    {run && !active && <AnimatedAccordion.Header>
+      <View accessible accessibilityRole="button" accessibilityState={{expanded}} style={s.workHeader}>
+        <Text style={s.summary}>{duration ? `Trabalhou por ${duration}` : 'Trabalhou'}</Text>
+        <Icon name={expanded ? 'chevron_down' : 'chevron_right'}/>
+      </View>
+    </AnimatedAccordion.Header>}
+    <AnimatedAccordion.Expanded>
       {parts.map((part,index) => {
-        if (part[0].kind === 'tool_call') return <ToolGroup key={part[0].id} items={part} active={active && index === parts.length-1}/>;
-        if (part[0].kind === 'reasoning') return <Reasoning key={part[0].id} item={part[0]}/>;
-        return <React.Fragment key={part[0].id}>{part.map(renderMessage)}</React.Fragment>;
+        if (part[0].kind === 'tool_call') return <AnimatedAccordion.Sibling key={part[0].id}><ToolGroup items={part} active={active && index === parts.length-1}/></AnimatedAccordion.Sibling>;
+        if (part[0].kind === 'reasoning') return <AnimatedAccordion.Sibling key={part[0].id}><Reasoning item={part[0]}/></AnimatedAccordion.Sibling>;
+        return <AnimatedAccordion.Sibling key={part[0].id}>{part.map(renderMessage)}</AnimatedAccordion.Sibling>;
       })}
-    </Accordion>
-  </View>;
+    </AnimatedAccordion.Expanded>
+  </AnimatedAccordion.Accordion>;
 }
 function Reasoning({item}: {item: ToolItem}) {
   const {styles: s} = useStyles(stylesheet);
   const [expanded, setExpanded] = useState(false);
-  return <View>
-    <Pressable accessibilityRole="button" accessibilityState={{expanded}} onPress={() => setExpanded(!expanded)} style={s.groupHeader}>
-      <Text style={s.summary}>Raciocínio</Text>
-      <Icon name={expanded ? 'chevron_down' : 'chevron_right'}/>
-    </Pressable>
-    <Accordion expanded={expanded} duration={220}>
+  return <AnimatedAccordion.Accordion isOpen={expanded} onChange={setExpanded}>
+    <AnimatedAccordion.Header>
+      <View accessible accessibilityRole="button" accessibilityState={{expanded}} style={s.groupHeader}>
+        <Text style={s.summary}>Raciocínio</Text>
+        <Icon name={expanded ? 'chevron_down' : 'chevron_right'}/>
+      </View>
+    </AnimatedAccordion.Header>
+    <AnimatedAccordion.Expanded>
       <Text selectable style={s.value}>{item.text}</Text>
-    </Accordion>
-  </View>;
+    </AnimatedAccordion.Expanded>
+  </AnimatedAccordion.Accordion>;
 }
