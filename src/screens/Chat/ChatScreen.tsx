@@ -21,8 +21,10 @@ import { SafeAreaView, useSafeAreaInsets} from 'react-native-safe-area-context';
 import { KeyboardStickyView} from 'react-native-keyboard-controller';
 import { KeyboardAwareLegendList, useKeyboardChatComposerInset, useKeyboardScrollToEnd} from '@legendapp/list/keyboard';
 import type {LegendListRef} from '@legendapp/list/react-native';
+import {Accordion as AnimatedAccordion} from '@animatereactnative/accordion';
+import {LinearTransition} from 'react-native-reanimated';
 import Markdown from 'react-native-markdown-display';
-import type {RenderRules} from 'react-native-markdown-display';
+import {StreamdownText} from 'react-native-streamdown';
 import { useStyles} from 'react-native-unistyles';
 import { EffortMenu} from '../../components/EffortMenu/EffortMenu';
 import { ApprovalMenu} from '../../components/ApprovalMenu/ApprovalMenu';
@@ -35,6 +37,7 @@ import { colors as C} from '../../theme';
 import { stylesheet} from './styles';
 import { Header} from '../../components/Header/Header';
 
+const accordionLayout = LinearTransition.springify().damping(70).stiffness(240);
 const markdownStyles = {
   body: {backgroundColor: 'transparent'},
   text: {color: C.text, fontSize: 16, lineHeight: 24},
@@ -59,78 +62,25 @@ const markdownStyles = {
   td: {borderColor: C.line, borderWidth: 1, padding: 6},
 };
 
-function FadingTail({text}: {text: string}) {
-  const [opacity, setOpacity] = useState(0.15);
-  useEffect(() => {
-    const started = Date.now();
-    const timer = setInterval(() => {
-      const progress = Math.min(1, (Date.now() - started) / 180);
-      setOpacity(0.15 + progress * 0.85);
-      if (progress === 1) clearInterval(timer);
-    }, 34);
-    return () => clearInterval(timer);
-  }, []);
-  return <Text style={{opacity}}>{text}</Text>;
-}
+const streamdownStyles = {
+  paragraph: {color: C.text, fontSize: 16, lineHeight: 24, marginTop: 0, marginBottom: 12},
+  h1: {color: C.text, fontSize: 24, lineHeight: 30, fontWeight: '700', marginTop: 12, marginBottom: 8},
+  h2: {color: C.text, fontSize: 21, lineHeight: 27, fontWeight: '700', marginTop: 10, marginBottom: 7},
+  h3: {color: C.text, fontSize: 18, lineHeight: 24, fontWeight: '700', marginTop: 8, marginBottom: 6},
+  strong: {color: C.text},
+  em: {color: C.text},
+  strikethrough: {},
+  link: {color: C.accent, underline: true},
+  blockquote: {borderColor: C.accent, borderWidth: 3, gapWidth: 12, backgroundColor: C.surface},
+  code: {color: C.text, backgroundColor: C.surface, fontFamily: 'monospace'},
+  codeBlock: {color: C.text, backgroundColor: C.surface, borderColor: C.line, borderWidth: 1, borderRadius: 10, padding: 12, fontFamily: 'monospace'},
+  list: {color: C.text, bulletColor: C.text, markerColor: C.text, marginTop: 0, marginBottom: 10},
+  table: {borderColor: C.line, borderWidth: 1, cellPaddingHorizontal: 6, cellPaddingVertical: 6},
+};
 
 function StreamingMarkdown({content, complete}: {content: string; complete: boolean}) {
-  const [visibleContent, setVisibleContent] = useState(() => complete ? content : '');
-  const [fadeTailLength, setFadeTailLength] = useState(0);
-  const visibleRef = React.useRef(visibleContent);
-  const targetRef = React.useRef(content);
-  const timerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const revealNextBatch = useCallback(() => {
-    timerRef.current = null;
-    const target = targetRef.current;
-    const current = visibleRef.current;
-    if (current.length < target.length) {
-      const pending = Array.from(target.slice(current.length));
-      const batchSize = Math.min(256, Math.max(8, Math.ceil(pending.length / 4)));
-      const addition = pending.slice(0, batchSize).join('');
-      visibleRef.current = current + addition;
-      setFadeTailLength(addition.length);
-      setVisibleContent(visibleRef.current);
-    }
-    if (visibleRef.current.length < targetRef.current.length) {
-      timerRef.current = setTimeout(revealNextBatch, 34);
-    }
-  }, []);
-
-  useEffect(() => {
-    targetRef.current = content;
-    const visible = visibleRef.current;
-    if (complete && !content.startsWith(visible) && content !== visible) {
-      visibleRef.current = content;
-      setFadeTailLength(0);
-      setVisibleContent(content);
-    } else if (!content.startsWith(visible)) {
-      let commonLength = 0;
-      while (commonLength < visible.length && commonLength < content.length && visible[commonLength] === content[commonLength]) commonLength += 1;
-      const commonPrefix = content.slice(0, commonLength);
-      visibleRef.current = commonPrefix;
-      setFadeTailLength(0);
-      setVisibleContent(commonPrefix);
-    }
-    if (visibleRef.current.length < content.length && timerRef.current === null) {
-      timerRef.current = setTimeout(revealNextBatch, 34);
-    }
-  }, [complete, content, revealNextBatch]);
-
-  useEffect(() => () => {if (timerRef.current !== null) clearTimeout(timerRef.current);}, []);
-
-  const rules = useMemo<RenderRules>(() => ({
-    text: (node, _children, _parents, styles, inheritedStyles = {}) => {
-      const value = node.content;
-      const tailLength = value && visibleContent.endsWith(value) ? Math.min(fadeTailLength, value.length) : 0;
-      return <Text key={node.key} style={[inheritedStyles, styles.text]}>
-        {tailLength ? value.slice(0, -tailLength) : value}
-        {tailLength ? <FadingTail text={value.slice(-tailLength)} /> : null}
-      </Text>;
-    },
-  }), [fadeTailLength, visibleContent]);
-
-  return <Markdown style={markdownStyles} rules={rules}>{visibleContent}</Markdown>;
+  if (complete) return <Markdown style={markdownStyles}>{content}</Markdown>;
+  return <StreamdownText markdown={content} markdownStyle={streamdownStyles} selectable={false} />;
 }
 
 const icons = {
@@ -503,7 +453,7 @@ export default function ChatScreen({cwd: initialCwd, model: initialModel, mode: 
     if (item.work) content = <View style={styles.assistantRow}><WorkActivity items={item.work} run={state.runs[item.runId]} renderMessage={workItem => renderAssistantMessage(workItem as Item, true)} /></View>;
     else if (item.kind === 'user') content = <View style={styles.userRow}><View style={styles.userBubble}><Text selectable style={styles.userText}>{item.text}</Text></View></View>;
     else content = renderAssistantMessage(item);
-    return <View>{content}</View>;
+    return <AnimatedAccordion.Sibling layout={accordionLayout}>{content}</AnimatedAccordion.Sibling>;
   }, [renderAssistantMessage, state.runs]);
 
   const scheduleScrollIdle = useCallback(() => {
