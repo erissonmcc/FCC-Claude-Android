@@ -31,7 +31,7 @@ export default function App() {
   }, []);
 
   return <SafeAreaProvider initialMetrics={initialWindowMetrics} style={{flex: 1, backgroundColor: '#000000'}}>
-    <KeyboardProvider>
+    <KeyboardProvider statusBarTranslucent navigationBarTranslucent>
       <PortalProvider>
         <ChatScreen
           cwd={cwd}
