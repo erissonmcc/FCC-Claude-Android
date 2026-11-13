@@ -8,7 +8,7 @@ export const stylesheet = createStyleSheet(theme => ({
   overlay: {...StyleSheet.absoluteFillObject, zIndex: 100, elevation: 20},
   panelFade: {position: 'absolute', elevation: 12},
   panel: {width: '100%', overflow: 'hidden', backgroundColor: theme.colors.effortSurface, borderRadius: 26, borderWidth: 1, borderColor: '#FFFFFF24'},
-  content: {paddingHorizontal: theme.spacing.lg, paddingTop: theme.spacing.md},
+  content: {paddingHorizontal: theme.spacing.lg, paddingTop: theme.spacing.md, paddingBottom: theme.spacing.md},
   heading: {flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: theme.spacing.xs},
   headingText: {flex: 1, color: theme.colors.muted, fontSize: theme.typography.base, lineHeight: 21, paddingRight: theme.spacing.sm},
   learnMore: {color: theme.colors.muted, fontSize: theme.typography.sm, textDecorationLine: 'underline'},

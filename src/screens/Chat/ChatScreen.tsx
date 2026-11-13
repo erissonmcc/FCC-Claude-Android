@@ -573,7 +573,7 @@ export default function ChatScreen({cwd: initialCwd, model: initialModel, mode: 
         initialScrollAtEnd
         keyboardLiftBehavior="whenAtEnd"
         keyboardOffset={Math.max(0, insets.bottom - 10)}
-        maintainScrollAtEnd={{animated: true}}
+        maintainScrollAtEnd={false}
         maintainVisibleContentPosition
         ListHeaderComponent={state.historyCursor ? <Pressable disabled={state.historyLoading} onPress={() => FccChat.loadOlder()} style={styles.loadEarlier}>
           <Text style={styles.loadEarlierText}>{state.historyLoading ? 'Carregando mensagens…' : 'Carregar mensagens anteriores'}</Text>
@@ -584,7 +584,7 @@ export default function ChatScreen({cwd: initialCwd, model: initialModel, mode: 
         onScrollBeginDrag={() => {
           listDragging.current = true;
           anchorDisabledByUser.current = true;
-          setAnchorId(null);
+          // Keep the anchor's end space while the user scrolls through the turn.
           onListScrollBegin();
         }}
         onScrollEndDrag={() => {

@@ -1,7 +1,7 @@
 import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {Animated, AppState, BackHandler, Image, Keyboard, PanResponder, ScrollView, StyleSheet, Text, View} from 'react-native';
 import {Portal} from '@gorhom/portal';
-import Reanimated, {runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming} from 'react-native-reanimated';
+import Reanimated, {runOnJS, useAnimatedStyle, useSharedValue, withTiming} from 'react-native-reanimated';
 import {useStyles} from 'react-native-unistyles';
 import {Pressable} from '../Pressable/Pressable';
 import {stylesheet} from './styles';
@@ -308,11 +308,10 @@ const EffortSlider = React.memo(function EffortSlider({values, selected, onSelec
   const progress = useSharedValue(currentProgress.current);
   const latest = useRef({values, onSelect, onPreview});
   latest.current = {values, onSelect, onPreview};
-  const trackInset = 16;
   const endpointInset = 32;
   const travel = Math.max(0, layoutWidth - endpointInset * 2);
 
-  const fillStyle = useAnimatedStyle(() => ({width: trackInset + travel * progress.value}));
+  const fillStyle = useAnimatedStyle(() => ({transform: [{translateX: -travel * (1 - progress.value)}]}));
   const thumbStyle = useAnimatedStyle(() => ({left: endpointInset + travel * progress.value - 14}));
 
   const progressFromPageX = (pageX: number) => {
@@ -350,7 +349,7 @@ const EffortSlider = React.memo(function EffortSlider({values, selected, onSelec
       currentProgress.current = snappedProgress;
       previewIndex.current = nearestIndex;
       latest.current.onPreview(latest.current.values[nearestIndex]);
-      progress.value = withSpring(snappedProgress, {stiffness: 120, damping: 24, overshootClamping: true}, finished => {
+      progress.value = withTiming(snappedProgress, {duration: 160}, finished => {
         if (finished) runOnJS(selectIndex)(nearestIndex);
       });
     },
@@ -381,8 +380,9 @@ const EffortSlider = React.memo(function EffortSlider({values, selected, onSelec
         {...responder.panHandlers}
         style={s.slider}
       >
-        <View pointerEvents="none" style={s.track} />
-        <Reanimated.View pointerEvents="none" style={[s.fill, fillStyle]} />
+        <View pointerEvents="none" style={s.track}>
+          <Reanimated.View style={[s.fill, fillStyle]} />
+        </View>
         <View pointerEvents="none" style={[s.steps, {left: endpointInset, right: endpointInset}]}>
           {values.map(value => <View key={value} style={s.dot} />)}
         </View>
