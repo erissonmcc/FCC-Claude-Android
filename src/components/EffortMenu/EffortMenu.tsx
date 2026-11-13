@@ -216,7 +216,7 @@ export function EffortMenu({
 
                   {values.length > 0 && (
                     <EffortSlider
-                      key={`${modelId}-${selectedEffort}`}
+                      key={modelId}
                       values={values}
                       selected={selectedEffort}
                       onSelect={selectEffort}
@@ -306,6 +306,12 @@ const EffortSlider = React.memo(function EffortSlider({values, selected, onSelec
   const didMove = useRef(false);
   const currentProgress = useRef(initialIndex / Math.max(1, values.length - 1));
   const progress = useSharedValue(currentProgress.current);
+  useEffect(() => {
+    const nextProgress = initialIndex / Math.max(1, values.length - 1);
+    previewIndex.current = initialIndex;
+    currentProgress.current = nextProgress;
+    progress.value = nextProgress;
+  }, [initialIndex, progress, values.length]);
   const latest = useRef({values, onSelect, onPreview});
   latest.current = {values, onSelect, onPreview};
   const endpointInset = 32;
