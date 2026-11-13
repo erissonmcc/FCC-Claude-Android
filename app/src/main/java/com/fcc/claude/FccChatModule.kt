@@ -187,7 +187,7 @@ class FccChatModule(private val context: ReactApplicationContext) :
     @ReactMethod
     fun applySettings(cwd: String, modelName: String, mode: String, effort: String, promise: Promise) =
         runWithModel(promise) { vm ->
-            check(vm.applySettings(cwd, modelName, mode, effort)) { "Não foi possível salvar as configurações" }
+            check(vm.applySettings(cwd, modelName, mode, effort)) { vm.error.value ?: "Não foi possível salvar as configurações" }
             stateJson(vm).toString()
         }
 

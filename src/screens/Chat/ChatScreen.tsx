@@ -37,7 +37,7 @@ import { colors as C} from '../../theme';
 import { stylesheet} from './styles';
 import { Header} from '../../components/Header/Header';
 
-const accordionLayout = LinearTransition.springify().damping(70).stiffness(240);
+const accordionLayout = LinearTransition.duration(180);
 const markdownStyles = {
   body: {backgroundColor: 'transparent'},
   text: {color: C.text, fontSize: 16, lineHeight: 24},
@@ -361,9 +361,21 @@ export default function ChatScreen({cwd: initialCwd, model: initialModel, mode: 
   useEffect(() => {
     const emitter = new NativeEventEmitter(NativeModules.FccChat);
     const subscription = emitter.addListener('fccStateChanged', applySnapshot);
-    FccChat.getBackendConfig().then(raw => { const config = JSON.parse(raw); setLocalBackendUrl(config.url); setLocalBackendToken(config.token); syncConfig({cwd: localCwd, model: localModel, mode: localMode, effort: localEffort, backendUrl: config.url, backendToken: config.token}); }).finally(() => FccChat.initialize().then(applySnapshot).catch(error => setState(prev => ({...prev, error: String(error)}))).finally(() => setReady(true)));
     return () => subscription.remove();
-  }, [applySnapshot, localCwd, localModel, localMode, localEffort, syncConfig]);
+  }, [applySnapshot]);
+
+  const snapshotHandler = React.useRef(applySnapshot);
+  snapshotHandler.current = applySnapshot;
+  useEffect(() => {
+    FccChat.getBackendConfig().then(raw => {
+      const config = JSON.parse(raw);
+      setLocalBackendUrl(config.url);
+      setLocalBackendToken(config.token);
+    }).finally(() => FccChat.initialize()
+      .then(snapshot => snapshotHandler.current(snapshot))
+      .catch(error => setState(prev => ({...prev, error: String(error)})))
+      .finally(() => setReady(true)));
+  }, []);
 
   const send = useCallback(async () => {
     const value = state.draft;

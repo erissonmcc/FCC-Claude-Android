@@ -23,6 +23,8 @@ internal object ChatRepository {
     fun defaultWorkingDirectory(): String =
         if (baseUrl.startsWith("https://")) "/opt/render/project/src/data/workspace" else "/storage/emulated/0"
 
+    fun historyScope(): String = baseUrl + "\n" + authToken
+
     fun localWorkspace(context: android.content.Context): String = context.getSharedPreferences("fcc_backend", android.content.Context.MODE_PRIVATE)
         .getString("local_workspace", "/storage/emulated/0") ?: "/storage/emulated/0"
 

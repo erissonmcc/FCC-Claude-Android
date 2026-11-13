@@ -58,6 +58,8 @@ internal class ChatViewModel(application: Application) : AndroidViewModel(applic
 
     private val detailLock = Mutex()
     private val settingsLock = Mutex()
+    private val transcriptStore = TranscriptStore(java.io.File(application.filesDir, "transcripts"))
+    private val transcriptSavedAt = mutableMapOf<String, Long>()
     private val deviceToolsInFlight = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
     private val deviceToolsCompleted = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
     private val deviceToolResults = java.util.concurrent.ConcurrentHashMap<String, DeviceToolResult>()
@@ -83,6 +85,80 @@ internal class ChatViewModel(application: Application) : AndroidViewModel(applic
     } catch (failure: Exception) {
         error.value = "Não foi possível salvar as mensagens: ${failure.message}"
         false
+    }
+
+    private suspend fun restoreTranscript(id: String): Boolean {
+        val scope = ChatRepository.historyScope()
+        val generation = detailGeneration.intValue
+        val turn = turnGeneration
+        return try {
+            val raw = withContext(Dispatchers.IO) { transcriptStore.load(scope, id) } ?: return false
+            if (session.value?.id != id || ChatRepository.historyScope() != scope ||
+                detailGeneration.intValue != generation || turnGeneration != turn) return false
+            val cached = JSONObject(raw)
+            require(cached.getInt("version") == 1 && cached.getString("session_id") == id)
+            val cachedItems = cached.getJSONArray("items")
+            val restored = (0 until cachedItems.length()).map { index ->
+                val item = cachedItems.getJSONObject(index)
+                ChatItem(item.getString("id"), item.getString("kind"), item.getString("text"),
+                    item.optString("title"), item.optBoolean("complete", true), item.optString("run_id"),
+                    item.optLong("ordinal", Long.MAX_VALUE), item.optLong("sequence", Long.MAX_VALUE))
+            }
+            val cachedRuns = cached.getJSONArray("runs")
+            val restoredRuns = (0 until cachedRuns.length()).map { index ->
+                val run = cachedRuns.getJSONObject(index)
+                ChatRun(run.getString("id"), run.getString("status"), run.getLong("created_at"),
+                    if (run.isNull("finished_at")) null else run.getLong("finished_at"),
+                    if (run.isNull("consumed_tokens")) null else run.getLong("consumed_tokens"))
+            }
+            val ids = cached.getJSONArray("history_ids")
+            Snapshot.withMutableSnapshot {
+                items.clear()
+                items.addAll(restored)
+                runs.clear()
+                restoredRuns.forEach { runs[it.id] = it }
+                historyIds.clear()
+                for (index in 0 until ids.length()) historyIds.add(ids.getString(index))
+                historyCursors.clear()
+                historyCursor.value = cached.optString("next_before").takeIf { it.isNotBlank() && it != "null" }
+                historyGeneration.intValue = detailGeneration.intValue
+                detailLoadedForSession.value = id
+            }
+            true
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) { false }
+    }
+
+    private suspend fun saveTranscript(id: String, scope: String) {
+        val now = System.currentTimeMillis()
+        if (busy.value && now - (transcriptSavedAt[id] ?: 0) < 1000) return
+        val cached = JSONObject().put("version", 1).put("session_id", id)
+            .put("next_before", historyCursor.value ?: JSONObject.NULL)
+            .put("history_ids", JSONArray(historyIds.toList()))
+            .put("items", JSONArray().apply { items.forEach { item ->
+                put(JSONObject().put("id", item.id).put("kind", item.kind).put("text", item.text)
+                    .put("title", item.title).put("complete", item.complete).put("run_id", item.runId)
+                    .put("ordinal", item.ordinal).put("sequence", item.sequence))
+            } })
+            .put("runs", JSONArray().apply { runs.values.forEach { run ->
+                put(JSONObject().put("id", run.id).put("status", run.status).put("created_at", run.createdAt)
+                    .put("finished_at", run.finishedAt ?: JSONObject.NULL).put("consumed_tokens", run.consumedTokens ?: JSONObject.NULL))
+            } }).toString()
+        try {
+            withContext(Dispatchers.IO) { transcriptStore.save(scope, id, cached) }
+            transcriptSavedAt[id] = now
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            historyError.value = "Não foi possível salvar o histórico local: ${failure.message}"
+        }
+    }
+
+    private fun removeTranscript(id: String) {
+        val scope = ChatRepository.historyScope()
+        viewModelScope.launch(Dispatchers.IO) { transcriptStore.remove(scope, id) }
+        transcriptSavedAt.remove(id)
     }
 
     suspend fun refresh(cwd: String, options: LaunchOptions, launchPrompt: String?): String? {
@@ -112,7 +188,14 @@ internal class ChatViewModel(application: Application) : AndroidViewModel(applic
                 }
                 if (!launchPrompt.isNullOrBlank()) promptToSend = launchPrompt
             }
-            session.value?.let { loadDetail(it.id) }
+            session.value?.let { active ->
+                if (items.isEmpty() && restoreTranscript(active.id)) {
+                    viewModelScope.launch {
+                        runCatching { loadDetail(active.id) }
+                            .onFailure { if (session.value?.id == active.id) error.value = it.message }
+                    }
+                } else loadDetail(active.id)
+            }
             error.value = null
             return promptToSend
         } catch (failure: Exception) {
@@ -130,16 +213,29 @@ internal class ChatViewModel(application: Application) : AndroidViewModel(applic
             detailLoadedForSession.value = null
             busy.value = false
             activeRunId.value = ""
+            items.clear()
+            runs.clear()
+            prompts.clear()
+            historyIds.clear()
+            historyCursors.clear()
+            historyCursor.value = null
+            historyError.value = null
         }
         session.value = entry
         currentCwd = entry.cwd
-        runCatching { loadDetail(entry.id) }
+        if (items.isEmpty() && restoreTranscript(entry.id)) {
+            viewModelScope.launch {
+                runCatching { loadDetail(entry.id) }
+                    .onFailure { if (session.value?.id == entry.id) error.value = it.message }
+            }
+        } else runCatching { loadDetail(entry.id) }
             .onFailure { if (session.value?.id == entry.id) error.value = it.message ?: "Não foi possível carregar a conversa." }
     }
 
     suspend fun deleteSession(entry: ChatSession) {
         runCatching { ChatRepository.delete("/admin/api/code/sessions/${entry.id}?expected_revision=${entry.revision}") }
             .onSuccess {
+                removeTranscript(entry.id)
                 sessions.remove(entry)
                 if (session.value?.id == entry.id) {
                     sessionDrafts[entry.id] = draft.value
@@ -204,9 +300,13 @@ internal class ChatViewModel(application: Application) : AndroidViewModel(applic
                         .put("model", model.ifEmpty { active.model })
                         .put("mode", mode)
                     if (effort.isNotEmpty()) changes.put("reasoning_effort", effort)
-                    ChatRepository.patch("/admin/api/code/sessions/${active.id}", changes)
-                    loadDetail(active.id)
+                    val updated = ChatRepository.patch("/admin/api/code/sessions/${active.id}", changes).toSession()
+                    val current = session.value
+                    if (current?.id == active.id && updated.revision >= current.revision) session.value = updated
+                    val index = sessions.indexOfFirst { it.id == active.id }
+                    if (index >= 0 && updated.revision >= sessions[index].revision) sessions[index] = updated
                 }
+                error.value = null
                 true
             }.onFailure { error.value = it.message }
                 .getOrDefault(false)
@@ -229,6 +329,7 @@ internal class ChatViewModel(application: Application) : AndroidViewModel(applic
         viewModelScope.launch {
             while (currentCoroutineContext().isActive) {
                 delay(if (feedConnected.value) 15000 else if (busy.value) 1300 else 6000)
+                if (feedConnected.value && !busy.value) continue
                 if (!connected.value) refresh(currentCwd, currentLaunchOptions, null)
                 else session.value?.id?.let { id ->
                     runCatching { loadDetail(id) }.onFailure { if (session.value?.id == id) error.value = it.message }
@@ -257,6 +358,7 @@ internal class ChatViewModel(application: Application) : AndroidViewModel(applic
                             else -> if (data.optString("epoch") == bootstrap.value.optString("epoch")) {
                                 val sessionId = data.optString("session_id")
                                 if (type == "session.deleted") {
+                                    removeTranscript(sessionId)
                                     sessions.removeAll { it.id == sessionId }
                                     pendingAttachments.removeAll { it.sessionId == sessionId }
                                     sessionDrafts.remove(sessionId)
@@ -274,10 +376,14 @@ internal class ChatViewModel(application: Application) : AndroidViewModel(applic
                                     data.optJSONObject("session")?.toSession()?.let { updated ->
                                         val index = sessions.indexOfFirst { it.id == updated.id }
                                         if (index >= 0) sessions[index] = updated else sessions.add(0, updated)
+                                        val active = session.value
+                                        if (active?.id == updated.id && updated.revision >= active.revision) session.value = updated
                                     }
                                     if (sessionId == session.value?.id) {
                                         if (type == "session.notice") error.value = data.optString("message")
-                                        detailSignals.trySend(Unit)
+                                        val metadataOnly = type == "session.updated" && !busy.value &&
+                                            data.optJSONObject("run")?.optString("status") !in setOf("preparing", "running", "stopping")
+                                        if (!metadataOnly) detailSignals.trySend(Unit)
                                     }
                                 }
                             }
@@ -502,6 +608,7 @@ internal class ChatViewModel(application: Application) : AndroidViewModel(applic
     }
 
     suspend fun loadDetail(id: String, older: Boolean = false) {
+        val historyScope = ChatRepository.historyScope()
         val generation = detailGeneration.intValue
         var failedTurnRecovery: Pair<ChatSession, String>? = null
         detailLock.withLock {
@@ -661,7 +768,7 @@ internal class ChatViewModel(application: Application) : AndroidViewModel(applic
                 if (!older) {
                     prompts.clear()
                     prompts.addAll(parsedPrompts)
-                    session.value = updated
+                    if (updated.revision >= (session.value?.revision ?: 0)) session.value = updated
                     if (canApplyRunSnapshot(snapshotTurnGeneration, turnGeneration, snapshotStartedWhileSending)) {
                         activeRunId.value = activeRunTarget(run?.optString("id").orEmpty(), run?.optString("status").orEmpty())
                         busy.value = sendingSessionId.value == id || run?.optString("status") in setOf("preparing", "running", "stopping")
@@ -669,6 +776,7 @@ internal class ChatViewModel(application: Application) : AndroidViewModel(applic
                     detailLoadedForSession.value = id
                 }
             }
+            saveTranscript(id, historyScope)
         }
         failedTurnRecovery?.let { (staleSession, text) ->
             if (text.isNotBlank() && session.value?.id == staleSession.id) {
