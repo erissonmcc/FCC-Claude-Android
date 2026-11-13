@@ -143,7 +143,7 @@ const FccChat = NativeModules.FccChat as {
   newSession(cwd: string, model: string, mode: string, effort: string): Promise<unknown>;
   selectSession(id: string): Promise<unknown>;
   deleteSession(id: string): Promise<unknown>;
-  applySettings(cwd: string, model: string, mode: string, effort: string): Promise<unknown>;
+  applySettings(cwd: string, model: string, mode: string, effort: string): Promise<string>;
   chooseProjectFolder(path: string): Promise<string | null>;
   respondPrompt(id: string, approved: boolean, answers?: string | null): Promise<unknown>;
   loadOlder(): Promise<unknown>;
@@ -231,6 +231,9 @@ export default function ChatScreen({cwd: initialCwd, model: initialModel, mode: 
   const [localModel, setLocalModel] = useState(initialModel);
   const [localMode, setLocalMode] = useState(initialMode);
   const [localEffort, setLocalEffort] = useState(initialEffort);
+  const pendingEffort = React.useRef<{value: string; request: number} | null>(null);
+  const effortRequest = React.useRef(0);
+  const configRevision = React.useRef(-1);
   const [localBackendUrl, setLocalBackendUrl] = useState(initialBackendUrl);
   const [localBackendToken, setLocalBackendToken] = useState(initialBackendToken);
   const insets = useSafeAreaInsets();
@@ -318,6 +321,8 @@ export default function ChatScreen({cwd: initialCwd, model: initialModel, mode: 
     try {
       const next = JSON.parse(value) as ChatState;
       const changedSession = sessionId.current !== next.session?.id;
+      if (changedSession) configRevision.current = -1;
+      if (changedSession && sessionId.current !== undefined) pendingEffort.current = null;
       sessionId.current = next.session?.id;
       if (changedSession) pendingDrafts.current = [];
       const acknowledged = pendingDrafts.current.lastIndexOf(next.draft);
@@ -339,7 +344,9 @@ export default function ChatScreen({cwd: initialCwd, model: initialModel, mode: 
       });
       setState(previous => ({...next, draft: pendingDrafts.current.length ? previous.draft : next.draft}));
       if (next.session?.cwd) {
-        const cfg = {cwd: next.session.cwd, model: next.session.model ?? '', mode: next.session.mode || 'config', effort: next.session.reasoningEffort ?? '', backendUrl: localBackendUrl, backendToken: localBackendToken};
+        if (next.session.revision < configRevision.current) return;
+        configRevision.current = next.session.revision;
+        const cfg = {cwd: next.session.cwd, model: next.session.model ?? '', mode: next.session.mode || 'config', effort: pendingEffort.current?.value ?? next.session.reasoningEffort ?? '', backendUrl: localBackendUrl, backendToken: localBackendToken};
         setLocalCwd(cfg.cwd);
         setLocalModel(cfg.model);
         setLocalMode(cfg.mode);
@@ -613,7 +620,21 @@ export default function ChatScreen({cwd: initialCwd, model: initialModel, mode: 
           modelId={localModel || state.bootstrap?.default_model || ""}
           models={state.bootstrap?.models || []}
           effort={localEffort}
-          onSelectEffort={value => { setLocalEffort(value); syncConfig({cwd: localCwd, model: localModel, mode: localMode, effort: value, backendUrl: localBackendUrl, backendToken: localBackendToken}); void FccChat.applySettings(localCwd, localModel, localMode, value); }}
+          onSelectEffort={value => {
+            const request = ++effortRequest.current;
+            pendingEffort.current = {value, request};
+            setLocalEffort(value);
+            syncConfig({cwd: localCwd, model: localModel, mode: localMode, effort: value, backendUrl: localBackendUrl, backendToken: localBackendToken});
+            void FccChat.applySettings(localCwd, localModel, localMode, value).then(snapshot => {
+              if (pendingEffort.current?.request !== request) return;
+              pendingEffort.current = null;
+              applySnapshot(snapshot);
+            }).catch(error => {
+              if (pendingEffort.current?.request !== request) return;
+              pendingEffort.current = null;
+              setState(previous => ({...previous, error: String(error)}));
+            });
+          }}
           onSelectModel={newModel => {
             setLocalModel(newModel);
             syncConfig({cwd: localCwd, model: newModel, mode: localMode, effort: localEffort, backendUrl: localBackendUrl, backendToken: localBackendToken});

@@ -57,6 +57,7 @@ internal class ChatViewModel(application: Application) : AndroidViewModel(applic
     var feedConnected = mutableStateOf(false)
 
     private val detailLock = Mutex()
+    private val settingsLock = Mutex()
     private val deviceToolsInFlight = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
     private val deviceToolsCompleted = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
     private val deviceToolResults = java.util.concurrent.ConcurrentHashMap<String, DeviceToolResult>()
@@ -192,22 +193,24 @@ internal class ChatViewModel(application: Application) : AndroidViewModel(applic
     }
 
     suspend fun applySettings(cwd: String, model: String, mode: String, effort: String): Boolean =
-        runCatching {
-            val active = session.value
-            if (active == null) {
-                startSession(cwd, model.ifEmpty { null }, mode, effort.ifEmpty { null }, clearDraft = false)
-            } else {
-                val changes = JSONObject()
-                    .put("expected_revision", active.revision)
-                    .put("model", model.ifEmpty { active.model })
-                    .put("mode", mode)
-                if (effort.isNotEmpty()) changes.put("reasoning_effort", effort)
-                ChatRepository.patch("/admin/api/code/sessions/${active.id}", changes)
-                loadDetail(active.id)
-            }
-            true
-        }.onFailure { error.value = it.message }
-            .getOrDefault(false)
+        settingsLock.withLock {
+            runCatching {
+                val active = session.value
+                if (active == null) {
+                    startSession(cwd, model.ifEmpty { null }, mode, effort.ifEmpty { null }, clearDraft = false)
+                } else {
+                    val changes = JSONObject()
+                        .put("expected_revision", active.revision)
+                        .put("model", model.ifEmpty { active.model })
+                        .put("mode", mode)
+                    if (effort.isNotEmpty()) changes.put("reasoning_effort", effort)
+                    ChatRepository.patch("/admin/api/code/sessions/${active.id}", changes)
+                    loadDetail(active.id)
+                }
+                true
+            }.onFailure { error.value = it.message }
+                .getOrDefault(false)
+        }
 
     suspend fun chooseProjectFolder(initialPath: String): String? = runCatching {
         ChatRepository.post("/admin/api/code/folder-picker", JSONObject().put("initial_path", initialPath))
