@@ -290,10 +290,7 @@ export default function ChatScreen({cwd: initialCwd, model: initialModel, mode: 
   const latestOpacity = React.useRef(new Animated.Value(0)).current;
   const topBarScrollY = React.useRef(new Animated.Value(0)).current;
   const scrollIdleTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
-  const scrollDiagnosticTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const listDragging = React.useRef(false);
-  const scrollDiagnosticActive = React.useRef(false);
-  const previousScrollOffset = React.useRef<number | null>(null);
   const [composerHeight, setComposerHeight] = useState(112);
   const [anchorId, setAnchorId] = useState<string | null>(null);
   const anchorDisabledByUser = React.useRef(false);
@@ -324,7 +321,6 @@ export default function ChatScreen({cwd: initialCwd, model: initialModel, mode: 
 
   useEffect(() => () => {
     if (scrollIdleTimer.current !== null) clearTimeout(scrollIdleTimer.current);
-    if (scrollDiagnosticTimer.current !== null) clearTimeout(scrollDiagnosticTimer.current);
   }, []);
 
   useEffect(() => {
@@ -510,21 +506,13 @@ export default function ChatScreen({cwd: initialCwd, model: initialModel, mode: 
     return <View>{content}</View>;
   }, [renderAssistantMessage, state.runs]);
 
-  const restoreAnchorIfAtBottom = useCallback(() => {
-    if (!isNearBottom.current) return;
-    anchorDisabledByUser.current = false;
-    const latestUser = [...rows].reverse().find(item => item.kind === 'user');
-    if (latestUser) setAnchorId(latestUser.id);
-  }, [rows]);
-
   const scheduleScrollIdle = useCallback(() => {
     if (scrollIdleTimer.current !== null) clearTimeout(scrollIdleTimer.current);
     scrollIdleTimer.current = setTimeout(() => {
       if (listDragging.current) return;
       setListScrolling(false);
-      restoreAnchorIfAtBottom();
     }, 160);
-  }, [restoreAnchorIfAtBottom]);
+  }, []);
   const onListScrollBegin = useCallback(() => {
     if (scrollIdleTimer.current !== null) clearTimeout(scrollIdleTimer.current);
     setListScrolling(true);
@@ -532,28 +520,15 @@ export default function ChatScreen({cwd: initialCwd, model: initialModel, mode: 
   const onListScrollEnd = useCallback(() => {
     if (scrollIdleTimer.current !== null) clearTimeout(scrollIdleTimer.current);
     setListScrolling(false);
-    restoreAnchorIfAtBottom();
-  }, [restoreAnchorIfAtBottom]);
+  }, []);
   const onListScroll = useCallback((event: any) => {
     const {contentOffset, contentSize, layoutMeasurement} = event.nativeEvent;
-    const previousOffset = previousScrollOffset.current;
-    if (scrollDiagnosticActive.current) {
-      console.warn('[scroll-diag] offset sample', {
-        previousOffset,
-        offset: contentOffset.y,
-        dragging: listDragging.current,
-        busy: state.busy,
-        contentHeight: contentSize.height,
-        viewportHeight: layoutMeasurement.height,
-      });
-    }
-    previousScrollOffset.current = contentOffset.y;
     topBarScrollY.setValue(contentOffset.y);
     isNearBottom.current = contentOffset.y + layoutMeasurement.height >= contentSize.height - 120;
     setShowLatest(!isNearBottom.current);
     setListScrolling(true);
     scheduleScrollIdle();
-  }, [scheduleScrollIdle, state.busy, topBarScrollY]);
+  }, [scheduleScrollIdle, topBarScrollY]);
 
   return <DrawerLayoutAndroid
     ref={drawerRef}
@@ -587,6 +562,7 @@ export default function ChatScreen({cwd: initialCwd, model: initialModel, mode: 
       <KeyboardAwareLegendList
         ref={listRef}
         style={styles.messages}
+        decelerationRate={0.92}
         data={rows}
         keyExtractor={item => item.id}
         renderItem={renderItem}
@@ -605,34 +581,18 @@ export default function ChatScreen({cwd: initialCwd, model: initialModel, mode: 
         ListFooterComponent={footer}
         contentContainerStyle={[styles.messagesContent, {paddingTop: insets.top + 80, paddingBottom: 24}]}
         onScroll={onListScroll}
-        onScrollBeginDrag={event => {
-          if (scrollDiagnosticTimer.current !== null) clearTimeout(scrollDiagnosticTimer.current);
-          scrollDiagnosticActive.current = true;
+        onScrollBeginDrag={() => {
           listDragging.current = true;
-          console.warn('[scroll-diag] begin drag', {offset: event.nativeEvent.contentOffset.y});
           anchorDisabledByUser.current = true;
           setAnchorId(null);
           onListScrollBegin();
         }}
-        onScrollEndDrag={event => {
+        onScrollEndDrag={() => {
           listDragging.current = false;
-          console.warn('[scroll-diag] end drag', {offset: event.nativeEvent.contentOffset.y});
-          if (scrollDiagnosticTimer.current !== null) clearTimeout(scrollDiagnosticTimer.current);
-          scrollDiagnosticTimer.current = setTimeout(() => { scrollDiagnosticActive.current = false; }, 2000);
           scheduleScrollIdle();
         }}
-        onMomentumScrollBegin={event => {
-          if (scrollDiagnosticTimer.current !== null) clearTimeout(scrollDiagnosticTimer.current);
-          scrollDiagnosticActive.current = true;
-          console.warn('[scroll-diag] momentum begin', {offset: event.nativeEvent.contentOffset.y});
-          onListScrollBegin();
-        }}
-        onMomentumScrollEnd={event => {
-          console.warn('[scroll-diag] momentum end', {offset: event.nativeEvent.contentOffset.y});
-          onListScrollEnd();
-          if (scrollDiagnosticTimer.current !== null) clearTimeout(scrollDiagnosticTimer.current);
-          scrollDiagnosticTimer.current = setTimeout(() => { scrollDiagnosticActive.current = false; }, 2000);
-        }}
+        onMomentumScrollBegin={onListScrollBegin}
+        onMomentumScrollEnd={onListScrollEnd}
         scrollEventThrottle={16}
         keyboardShouldPersistTaps="handled"
       />
