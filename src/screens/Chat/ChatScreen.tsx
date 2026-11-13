@@ -32,6 +32,7 @@ import { ContextMenu, ContextMenuDots } from '../../components/ContextMenu/Conte
 import { GeneratingIndicator} from '../../components/GeneratingIndicator/GeneratingIndicator';
 import { Pressable} from '../../components/Pressable/Pressable';
 import { WorkActivity, type Run} from '../../components/ToolActivity/ToolActivity';
+import {hasFinalMessageAfterTools} from '../../components/ToolActivity/workActivityState';
 import { NativeEventEmitter, NativeModules} from 'react-native';
 import { colors as C} from '../../theme';
 import { stylesheet} from './styles';
@@ -432,7 +433,7 @@ export default function ChatScreen({cwd: initialCwd, model: initialModel, mode: 
   }, [optimisticMessages, state.items, state.pendingMessages, state.runMessages, state.session?.id]);
 
   const rows = useMemo(() => {
-    const result: (Item & {work?: Item[]})[] = [];
+    const result: (Item & {work?: Item[]; hasFinalMessage?: boolean})[] = [];
     let index = 0;
     while (index < visibleItems.length) {
       const item = visibleItems[index];
@@ -446,8 +447,10 @@ export default function ChatScreen({cwd: initialCwd, model: initialModel, mode: 
         if (visibleItems[cursor].kind === 'tool_call') lastTool = cursor;
       }
       if (run && lastTool >= index) {
-        result.push({...item, id: `work:${item.runId}:${item.id}`, work: visibleItems.slice(index, lastTool + 1)});
-        index = lastTool + 1;
+        const hasFinalMessage = hasFinalMessageAfterTools(visibleItems.slice(index, end), run.status);
+        const workEnd = hasFinalMessage ? lastTool + 1 : end;
+        result.push({...item, id: `work:${item.runId}:${item.id}`, work: visibleItems.slice(index, workEnd), hasFinalMessage});
+        index = workEnd;
       } else if (item.kind === 'tool_call') {
         const start = index;
         while (index < visibleItems.length && visibleItems[index].kind === 'tool_call') index++;
@@ -475,9 +478,9 @@ export default function ChatScreen({cwd: initialCwd, model: initialModel, mode: 
       {!item.complete && <View style={styles.streamMarker}><View style={styles.streamDot} /></View>}
     </View>;
   }, []);
-  const renderItem = useCallback(({item}: {item: Item & {work?: Item[]}}) => {
+  const renderItem = useCallback(({item}: {item: Item & {work?: Item[]; hasFinalMessage?: boolean}}) => {
     let content;
-    if (item.work) content = <View style={styles.assistantRow}><WorkActivity items={item.work} run={state.runs[item.runId]} renderMessage={workItem => renderAssistantMessage(workItem as Item, true)} /></View>;
+    if (item.work) content = <View style={styles.assistantRow}><WorkActivity items={item.work} run={state.runs[item.runId]} hasFinalMessage={item.hasFinalMessage} renderMessage={workItem => renderAssistantMessage(workItem as Item, true)} /></View>;
     else if (item.kind === 'user') content = <View style={styles.userRow}><View style={styles.userBubble}><Text selectable style={styles.userText}>{item.text}</Text></View></View>;
     else content = renderAssistantMessage(item);
     return <AnimatedAccordion.Sibling layout={accordionLayout}>{content}</AnimatedAccordion.Sibling>;

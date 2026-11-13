@@ -116,22 +116,22 @@ function ToolGroup({items, active}: {items: ToolItem[]; active: boolean}) {
     </AnimatedAccordion.Expanded>
   </AnimatedAccordion.Accordion>;
 }
-export function WorkActivity({items, run, renderMessage}: {items: ToolItem[]; run?: Run; renderMessage: (item: ToolItem) => React.ReactNode}) {
+export function WorkActivity({items, run, hasFinalMessage = false, renderMessage}: {items: ToolItem[]; run?: Run; hasFinalMessage?: boolean; renderMessage: (item: ToolItem) => React.ReactNode}) {
   const {styles: s} = useStyles(stylesheet);
   const active = !!run && ['preparing','running','stopping'].includes(run.status);
-  const [expanded, setExpanded] = useState(active);
-  useEffect(() => {setExpanded(active);}, [active]);
+  const canCollapse = !!run && !active && hasFinalMessage;
+  const [expanded, setExpanded] = useState(!canCollapse);
+  useEffect(() => {setExpanded(!canCollapse);}, [canCollapse]);
   const seconds = run?.finishedAt && run.createdAt > 0 ? Math.max(0, Math.floor((run.finishedAt - run.createdAt)/1000)) : null;
   const duration = seconds == null ? '' : seconds >= 3600 ? `${Math.floor(seconds/3600)} h ${Math.floor(seconds%3600/60)} min ${seconds%60} s` : seconds >= 60 ? `${Math.floor(seconds/60)} min ${seconds%60} s` : `${seconds} s`;
   const parts: ToolItem[][] = [];
   for (const item of items) {const last=parts[parts.length-1]; if (item.kind === 'tool_call' && last?.[0].kind === 'tool_call') last.push(item); else parts.push([item]);}
-  return <AnimatedAccordion.Accordion key={!run ? 'static' : active ? 'active' : 'finished'} isOpen={!run || active} onChange={setExpanded} layout={accordionLayout} style={s.work}>
-    {run && !active && <AnimatedAccordion.Header>
-      <View accessible accessibilityRole="button" accessibilityState={{expanded}} style={s.workHeader}>
+  const heading = <View accessible={canCollapse} accessibilityRole={canCollapse ? 'button' : undefined} accessibilityState={canCollapse ? {expanded} : undefined} style={[s.workHeader, !hasFinalMessage && s.workHeaderWithoutDivider]}>
         <Text style={s.summary}>{duration ? `Trabalhou por ${duration}` : 'Trabalhou'}</Text>
-        <Icon name={expanded ? 'chevron_down' : 'chevron_right'}/>
-      </View>
-    </AnimatedAccordion.Header>}
+        {canCollapse && <Icon name={expanded ? 'chevron_down' : 'chevron_right'}/>}
+      </View>;
+  return <AnimatedAccordion.Accordion key={canCollapse ? 'collapsible' : 'expanded'} isOpen={!canCollapse} onChange={setExpanded} layout={accordionLayout} style={s.work}>
+    {run && !active && (canCollapse ? <AnimatedAccordion.Header>{heading}</AnimatedAccordion.Header> : heading)}
     <AnimatedAccordion.Expanded layout={accordionLayout} entering={accordionEntering} exiting={accordionExiting}>
       {parts.map((part,index) => {
         if (part[0].kind === 'tool_call') return <AnimatedAccordion.Sibling key={part[0].id} layout={accordionLayout}><ToolGroup items={part} active={active && index === parts.length-1}/></AnimatedAccordion.Sibling>;
