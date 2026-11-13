@@ -96,7 +96,7 @@ export function ApprovalMenu({mode, onSelectMode}: {mode: string; onSelectMode: 
                   <Text style={s.learnMore}>Saiba mais</Text>
                 </Pressable>
               </View>
-              <ScrollView style={s.options} bounces={false} showsVerticalScrollIndicator={false}>
+              <ScrollView style={s.options} bounces={false} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="always" keyboardDismissMode="none">
                 {options.map(option => {
                   const selected = selectedMode === option.id;
                   return <Pressable key={option.id} accessibilityRole="button" accessibilityState={{selected}} onPress={() => {onSelectMode(option.id); setVisible(false);}} style={s.option}>

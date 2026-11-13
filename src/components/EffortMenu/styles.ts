@@ -37,11 +37,11 @@ export const stylesheet = createStyleSheet(theme => ({
   dot: {width: 7, height: 7, borderRadius: 4, backgroundColor: '#FFFFFF', opacity: 0.62},
   thumb: {position: 'absolute', width: 28, height: 28, top: 8, borderRadius: 14, backgroundColor: theme.colors.text, borderWidth: 2, borderColor: '#1683FF', zIndex: 3, elevation: 3},
 
-  modelsContainer: {paddingVertical: theme.spacing.xs},
-  modelsHeader: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6},
+  modelsContainer: {flex: 1, minHeight: 0, paddingVertical: theme.spacing.xs},
+  modelsHeader: {flexShrink: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6},
   backButton: {width: 32, height: 32, alignItems: 'center', justifyContent: 'center', borderRadius: 16},
   modelsTitle: {color: theme.colors.muted, fontSize: theme.typography.base, fontWeight: '500'},
-  modelsList: {height: 236, flexGrow: 0, flexShrink: 0},
+  modelsList: {flex: 1, minHeight: 0},
   modelsListContent: {paddingBottom: theme.spacing.xs},
   modelItem: {
     flexDirection: 'row',

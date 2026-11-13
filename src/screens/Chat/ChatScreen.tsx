@@ -18,11 +18,11 @@ import { StyleSheet,
   useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets} from 'react-native-safe-area-context';
-import { KeyboardStickyView} from 'react-native-keyboard-controller';
+import { KeyboardStickyView, useReanimatedKeyboardAnimation} from 'react-native-keyboard-controller';
 import { KeyboardAwareLegendList, useKeyboardChatComposerInset, useKeyboardScrollToEnd} from '@legendapp/list/keyboard';
 import type {LegendListRef} from '@legendapp/list/react-native';
 import {Accordion as AnimatedAccordion} from '@animatereactnative/accordion';
-import {LinearTransition} from 'react-native-reanimated';
+import Reanimated, {LinearTransition, useAnimatedStyle} from 'react-native-reanimated';
 import Markdown from 'react-native-markdown-display';
 import {StreamdownText} from 'react-native-streamdown';
 import { useStyles} from 'react-native-unistyles';
@@ -242,6 +242,11 @@ export default function ChatScreen({cwd: initialCwd, model: initialModel, mode: 
   const scrollIdleTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const listDragging = React.useRef(false);
   const [composerHeight, setComposerHeight] = useState(112);
+  const keyboardAnimation = useReanimatedKeyboardAnimation();
+  const keyboardOpenedOffset = Math.max(0, insets.bottom - 10);
+  const emptyOverlayStyle = useAnimatedStyle(() => ({
+    bottom: composerHeight + 24 - keyboardAnimation.height.value - keyboardAnimation.progress.value * keyboardOpenedOffset,
+  }));
   const [anchorId, setAnchorId] = useState<string | null>(null);
   const anchorDisabledByUser = React.useRef(false);
   const composerRef = React.useRef<View>(null);
@@ -546,9 +551,9 @@ export default function ChatScreen({cwd: initialCwd, model: initialModel, mode: 
         scrollEventThrottle={16}
         keyboardShouldPersistTaps="handled"
       />
-      {rows.length === 0 && <View pointerEvents="none" style={[styles.emptyOverlay, {top: insets.top + 80, bottom: composerHeight + 24}]}>
+      {rows.length === 0 && <Reanimated.View pointerEvents="none" style={[styles.emptyOverlay, {top: insets.top + 80}, emptyOverlayStyle]}>
         <View style={styles.emptyState}><Text style={styles.emptyTitle}>Como posso ajudar?</Text><Text style={styles.muted}>Converse com Claude sobre seu projeto.</Text></View>
-      </View>}
+      </Reanimated.View>}
       <View pointerEvents="none" style={[styles.transcriptBottomFade, {height: composerHeight + 36}]}>
         <Image source={{uri: 'transcript_bottom_fade'}} style={StyleSheet.absoluteFillObject} />
       </View>
